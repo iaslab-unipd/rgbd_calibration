@@ -1,0 +1,17 @@
+checkerboards:
+#- rows: 7
+#  cols: 6
+#  cell_width: 0.095
+#  cell_height: 0.096
+- rows: 5
+  cols: 6
+  cell_width: 0.12
+  cell_height: 0.12
+#- rows: 10
+#  cols: 9
+#  cell_width: 0.058
+#  cell_height: 0.0583
+#- rows: 5
+#  cols: 7
+#  cell_width: 0.080
+#  cell_height: 0.080
