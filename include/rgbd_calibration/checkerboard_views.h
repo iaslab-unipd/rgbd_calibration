@@ -43,57 +43,57 @@ public:
     // Do nothing
   }
 
-  void setId(const std::string & id)
+  inline void setId(const std::string & id)
   {
     id_ = id;
   }
 
-  const std::string & id() const
+  inline const std::string & id() const
   {
     return id_;
   }
 
-  void setData(const RGBDData::ConstPtr & data)
+  inline void setData(const RGBDData::ConstPtr & data)
   {
     data_ = data;
   }
 
-  const RGBDData::ConstPtr & data() const
+  inline const RGBDData::ConstPtr & data() const
   {
     return data_;
   }
 
-  void setCheckerboard(const Checkerboard::ConstPtr & checkerboard)
+  inline void setCheckerboard(const Checkerboard::ConstPtr & checkerboard)
   {
     checkerboard_ = checkerboard;
   }
 
-  const Checkerboard::ConstPtr & checkerboard() const
+  inline const Checkerboard::ConstPtr & checkerboard() const
   {
     return checkerboard_;
   }
 
-  const Checkerboard::Ptr & colorCheckerboard() const
+  inline const Checkerboard::Ptr & colorCheckerboard() const
   {
     return color_checkerboard_;
   }
 
-  const PlanarObject::Ptr & depthPlane() const
+  inline const PlanarObject::Ptr & depthPlane() const
   {
     return depth_plane_;
   }
 
-  PinholeView<Checkerboard>::ConstPtr colorView() const
+  inline PinholeView<Checkerboard>::ConstPtr colorView() const
   {
     return color_view_;
   }
 
-  DepthViewPCL<PlanarObject>::ConstPtr depthView() const
+  inline DepthViewPCL<PlanarObject>::ConstPtr depthView() const
   {
     return depth_view_;
   }
 
-  const pcl::IndicesConstPtr & planeInliers() const
+  inline const pcl::IndicesConstPtr & planeInliers() const
   {
     return plane_inliers_;
   }
