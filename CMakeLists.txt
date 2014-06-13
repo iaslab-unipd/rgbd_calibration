@@ -101,9 +101,9 @@ add_executable(test_calibration
   src/rgbd_calibration/calibration_test.cpp              include/rgbd_calibration/calibration_test.h
 )
 
-#add_executable(data_collection
-#  src/rgbd_calibration/data_collection_node.cpp
-#)
+add_executable(data_collection
+  src/rgbd_calibration/data_collection_node.cpp
+)
 
 ## Add dependencies to the executable
 # add_dependencies(calibration_node ${PROJECT_NAME})
@@ -141,11 +141,11 @@ target_link_libraries(test_calibration
   ${CERES_LIBRARIES}
 )
 
-#target_link_libraries(data_collection
-#  ${catkin_LIBRARIES}
-#  ${PCL_LIBRARIES}
-#  ${OpenCV_LIBS}
-#)
+target_link_libraries(data_collection
+  ${catkin_LIBRARIES}
+  ${PCL_LIBRARIES}
+  ${OpenCV_LIBS}
+)
 
 #############
 ## Install ##

@@ -63,9 +63,6 @@ protected:
   void
   cameraInfoCallback(const sensor_msgs::CameraInfo::ConstPtr & msg);
 
-//  void
-//  omnicameraInfoCallback(const OmnicameraInfo::ConstPtr & msg);
-
   void
   actionCallback(const std_msgs::String::ConstPtr & msg);
 
@@ -89,7 +86,6 @@ protected:
   pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud_msg_;
   sensor_msgs::Image::ConstPtr image_msg_;
   sensor_msgs::CameraInfo::ConstPtr camera_info_msg_;
-//  OmnicameraInfo::ConstPtr omnicamera_info_msg_;
 
 // TODO find another way to get checkerboards
   ros::Subscriber checkerboards_sub_;
@@ -106,6 +102,7 @@ protected:
   std::string cloud_filename_;
 
   bool search_checkerboard_;
+  double rate_;
 
 };
 
@@ -117,32 +114,13 @@ DataCollectionNode::DataCollectionNode(ros::NodeHandle & node_handle)
   cloud_sub_ = node_handle.subscribe("point_cloud", 1, &DataCollectionNode::pointCloudCallback, this);
   image_sub_ = image_transport_.subscribe("image", 1, &DataCollectionNode::imageCallback, this);
   camera_info_sub_ = node_handle.subscribe("camera_info", 1, &DataCollectionNode::cameraInfoCallback, this);
-//  omnicamera_info_sub_ = node_handle.subscribe("omnicamera_info", 1, &DataCollectionNode::omnicameraInfoCallback, this);
+
   checkerboards_sub_ = node_handle_.subscribe("checkerboard_array",
                                               1,
                                               &DataCollectionNode::checkerboardArrayCallback,
                                               this);
+
   action_sub_ = node_handle.subscribe("action", 1, &DataCollectionNode::actionCallback, this);
-
-//  std::string camera_type_string;
-//  node_handle_.param("camera_type", camera_type_string, std::string("pinhole"));
-//
-//  if (camera_type_string == "pinhole")
-//    camera_type_ = ColorSensor<double>::PINHOLE;
-//  else if (camera_type_string == "omnidirectional")
-//    camera_type_ = ColorSensor<double>::OMNIDIRECTIONAL;
-//  else
-//    throw std::runtime_error("Unknown camera type. Use \"pinhole\" or \"omnidirectional\"");
-
-//  std::string laser_type_string;
-//  node_handle_.param("laser_type", laser_type_string, std::string("kinect"));
-//
-//  if (laser_type_string == "kinect")
-//    laser_type_ = DepthSensor<double, pcl::PointXYZ>::KINECT;
-//  else if (laser_type_string == "laser")
-//    laser_type_ = DepthSensor<double, pcl::PointXYZ>::LASER;
-//  else
-//    throw std::runtime_error("Unknown laser type. Use \"kinect\" or \"laser\"");
 
   node_handle_.param("starting_index", starting_index_, 1);
   if (not node_handle_.getParam("save_folder", save_folder_))
@@ -158,6 +136,7 @@ DataCollectionNode::DataCollectionNode(ros::NodeHandle & node_handle)
   node_handle_.param("cloud_filename", cloud_filename_, std::string("cloud_"));
 
   node_handle_.param("search_checkerboard", search_checkerboard_, false);
+  node_handle_.param("rate", rate_, 2.0);
 
 }
 
@@ -171,8 +150,9 @@ bool DataCollectionNode::initialize()
   if (not waitForMessages())
     return false;
 
-  for (unsigned int i = 0; i < checkerboard_array_msg_->checkerboards.size(); ++i)
-    cb_vec_.push_back(createCheckerboard(checkerboard_array_msg_->checkerboards[i], i));
+  if (search_checkerboard_)
+    for (unsigned int i = 0; i < checkerboard_array_msg_->checkerboards.size(); ++i)
+      cb_vec_.push_back(createCheckerboard(checkerboard_array_msg_->checkerboards[i], i));
 
   return true;
 }
@@ -191,11 +171,6 @@ void DataCollectionNode::cameraInfoCallback(const sensor_msgs::CameraInfo::Const
 {
   camera_info_msg_ = msg;
 }
-
-//void DataCollectionNode::omnicameraInfoCallback(const calibration_msgs::OmnicameraInfo::ConstPtr & msg)
-//{
-//  omnicamera_info_msg_ = msg;
-//}
 
 void DataCollectionNode::actionCallback(const std_msgs::String::ConstPtr & msg)
 {
@@ -218,12 +193,12 @@ bool DataCollectionNode::waitForMessages() const
     rate.sleep();
     ros::spinOnce();
   }
-  return checkerboard_array_msg_;
+  return ros::ok();
 }
 
 void DataCollectionNode::spin()
 {
-  ros::Rate rate(2.0);
+  ros::Rate rate(rate_);
   while (ros::ok())
   {
     ros::spinOnce();
@@ -232,11 +207,12 @@ void DataCollectionNode::spin()
     {
       cv_bridge::CvImage::Ptr image_ptr = cv_bridge::toCvCopy(image_msg_, sensor_msgs::image_encodings::BGR8);
 
-      AutomaticCheckerboardFinder cb_finder;
-      cb_finder.setImage(image_ptr->image);
-
       if (search_checkerboard_)
       {
+
+        AutomaticCheckerboardFinder cb_finder;
+        cb_finder.setImage(image_ptr->image);
+
         bool has_pattern = false;
         std::vector<cv::Point2f> corners;
         for (size_t i = 0; not has_pattern and i < cb_vec_.size(); ++i)
@@ -277,13 +253,13 @@ void DataCollectionNode::save(const cv::Mat & image,
 }
 
 Checkerboard::Ptr DataCollectionNode::createCheckerboard(const CheckerboardMsg::ConstPtr & msg,
-                                                                 int id)
+                                                         int id)
 {
   return createCheckerboard(*msg, id);
 }
 
 Checkerboard::Ptr DataCollectionNode::createCheckerboard(const CheckerboardMsg & msg,
-                                                                 int id)
+                                                         int id)
 {
   std::stringstream ss;
   ss << "/checkerboard_" << id;
