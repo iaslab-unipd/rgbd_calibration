@@ -105,12 +105,10 @@ bool CalibrationNode::initialize()
     const Scalar fov_x = Scalar(DEG2RAD(KINECT_FOV_X)); // TODO add parameter
     const Scalar fov_y = Scalar(DEG2RAD(KINECT_FOV_Y)); // TODO add parameter
 
-    LUMatrixModel::Data::Ptr local_und_data =
-      boost::make_shared<LUMatrixModel::Data>(distortion_cols_,
-                                              distortion_rows_,
-                                              LocalPolynomial::IdentityCoefficients());
+    LocalModel::Data::Ptr local_und_data =
+      boost::make_shared<LocalModel::Data>(Size2(distortion_cols_, distortion_rows_), LocalPolynomial::IdentityCoefficients());
 
-    LUMatrixModel::Ptr local_und_model = boost::make_shared<LUMatrixModel>();
+    LocalModel::Ptr local_und_model = boost::make_shared<LocalModel>();
     local_und_model->setData(local_und_data);
     local_und_model->setFieldOfView(fov_x, fov_y);
 
@@ -118,7 +116,7 @@ bool CalibrationNode::initialize()
 //    local_und->setModel(local_und_model);
 
     GUMatrixModel::Data::Ptr global_und_data =
-      boost::make_shared<GUMatrixModel::Data>(2, 2, GlobalPolynomial::IdentityCoefficients());
+      boost::make_shared<GUMatrixModel::Data>(Size2(2, 2), GlobalPolynomial::IdentityCoefficients());
 
     GUMatrixModel::Ptr global_und_model = boost::make_shared<GUMatrixModel>();
     global_und_model->setData(global_und_data);

@@ -108,7 +108,7 @@ bool TestNode::initialize()
   color_sensor_->transform(camera_pose_);
 
   double local_fov_x, local_fov_y;
-  LUMatrixModel::Data::Ptr local_und_data;
+  LocalModel::Data::Ptr local_und_data;
 
   PolynomialUndistortionMatrixIO<LocalPolynomial> local_io;
   if (not local_io.read(local_und_data, local_und_matrix_file_, local_fov_x, local_fov_y))
@@ -121,11 +121,11 @@ bool TestNode::initialize()
   if (not global_io.read(global_und_data, global_und_matrix_file_, global_fov_x, global_fov_y))
     ROS_FATAL_STREAM("File " << global_und_matrix_file_ << " not found!!");
 
-  LUMatrixModel::Ptr local_und_model = boost::make_shared<LUMatrixModel>();
+  LocalModel::Ptr local_und_model = boost::make_shared<LocalModel>();
   local_und_model->setData(local_und_data);
   local_und_model->setFieldOfView(local_fov_x, local_fov_y);
 
-  LUMatrixPCL::Ptr local_und = boost::make_shared<LUMatrixPCL>();
+  LocalMatrixPCL::Ptr local_und = boost::make_shared<LocalMatrixPCL>();
   local_und->setModel(local_und_model);
 
   GUMatrixModel::Ptr global_und_model = boost::make_shared<GUMatrixModel>();

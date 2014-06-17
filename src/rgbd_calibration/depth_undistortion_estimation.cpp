@@ -108,7 +108,7 @@ void DepthUndistortionEstimation::estimateLocalModel()
         {
           local_fit_->accumulateCloud(cloud, *plane_info.indices_);
           local_fit_->addAccumulatedPoints(fitted_plane);
-          for (size_t c = 0; c < gt_cb.corners().size(); ++c)
+          for (size_t c = 0; c < gt_cb.corners().size().prod(); ++c)
           {
             const Point3 & corner = gt_cb.corners()[c];
             Line line(corner, Point3::UnitZ());

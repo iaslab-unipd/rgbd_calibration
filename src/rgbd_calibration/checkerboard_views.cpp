@@ -98,7 +98,7 @@ void CheckerboardViews::draw(cv::Mat & image) const
 {
   cv::Size pattern_size(color_checkerboard_->rows(), color_checkerboard_->cols());
   std::vector<cv::Point2f> corners;
-  for (int i = 0; i < color_view_->points().size(); ++i)
+  for (int i = 0; i < color_view_->points().size().prod(); ++i)
     corners.push_back(cv::Point2f(color_view_->points()[i][0], color_view_->points()[i][1]));
 
   cv::drawChessboardCorners(image, pattern_size, cv::Mat(corners), true);

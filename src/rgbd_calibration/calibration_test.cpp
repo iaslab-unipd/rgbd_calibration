@@ -151,7 +151,7 @@ void CalibrationTest::testPlanarityError() const
     Scalar und_mean = 0;
     Scalar und_max = 0;
     Scalar und_var = 0;
-    for (int p = 0; p < und_points.size(); ++p)
+    for (int p = 0; p < und_points.elements(); ++p)
     {
       d_mean += und_points[p].z();
       Scalar d = und_plane.absDistance(und_points[p]);
@@ -161,9 +161,9 @@ void CalibrationTest::testPlanarityError() const
         und_max = d;
     }
 
-    d_mean /= und_points.size();
-    und_mean /= und_points.size();
-    und_var /= und_points.size();
+    d_mean /= und_points.elements();
+    und_mean /= und_points.elements();
+    und_var /= und_points.elements();
     und_var -= und_mean * und_mean;
 
     const Cloud3 points = PCLConversion<Scalar>::toPointMatrix(*data->depthData(), *cb_views.planeInliers());
@@ -172,7 +172,7 @@ void CalibrationTest::testPlanarityError() const
     Scalar mean = 0;
     Scalar max = 0;
     Scalar var = 0;
-    for (int p = 0; p < points.size(); ++p)
+    for (int p = 0; p < points.elements(); ++p)
     {
       Scalar d = plane.absDistance(points[p]);
       mean += d;
@@ -181,8 +181,8 @@ void CalibrationTest::testPlanarityError() const
         max = d;
     }
 
-    mean /= points.size();
-    var /= points.size();
+    mean /= points.elements();
+    var /= points.elements();
     var -= mean * mean;
 
     ROS_INFO_STREAM(d_mean << " " << mean << " " << std::sqrt(var) << " " << max << " ** " << und_mean << " " << std::sqrt(und_var) << " " << und_max);
@@ -219,7 +219,7 @@ public:
   {
     typename Types<T>::Pose checkerboard_pose_eigen = toEigen<T>(checkerboard_pose);
 
-    typename Types<T>::Cloud3 cb_corners(checkerboard_->cols(), checkerboard_->rows());
+    typename Types<T>::Cloud3 cb_corners(checkerboard_->corners().size());
     cb_corners.container() = checkerboard_pose_eigen * checkerboard_->corners().container().cast<T>();
     typename Types<T>::Plane plane = Types<T>::Plane::Through(cb_corners(0, 0),
                                                               cb_corners(checkerboard_->cols() - 1, 0),
@@ -230,7 +230,7 @@ public:
     eigen_normal.normalize();
 
     residuals[0] = ceres::acos(plane.normal().dot(eigen_normal));
-    for (size_t i = 0; i < cb_corners.size(); ++i)
+    for (Size1 i = 0; i < cb_corners.elements(); ++i)
     {
       residuals[i + 1] = T((reprojected_corners[i] - image_corners_[i].cast<T>()).norm());
     }
@@ -262,7 +262,7 @@ void CalibrationTest::testCheckerboardError() const
   Eigen::Matrix<Scalar, 1, 3, Eigen::DontAlign | Eigen::RowMajor> normal =
       cb_views_vec[0]->colorCheckerboard()->plane().normal();
 
-  for (size_t i = 0; i < cb_views_vec.size(); ++i)
+  for (Size1 i = 0; i < cb_views_vec.size(); ++i)
   {
     const CheckerboardViews & cb_views = *cb_views_vec[i];
 
@@ -317,37 +317,37 @@ void CalibrationTest::testCheckerboardError() const
 
     Scalar d_mean = 0;
     Scalar und_mean = 0;
-    for (int p = 0; p < und_points.size(); ++p)
+    for (int p = 0; p < und_points.elements(); ++p)
     {
       d_mean += und_points[p].z();
       Scalar d = plane.absDistance(und_points[p]);
       und_mean += d;
     }
 
-    d_mean /= und_points.size();
-    und_mean /= und_points.size();
+    d_mean /= und_points.elements();
+    und_mean /= und_points.elements();
 
     const Cloud3 points = PCLConversion<Scalar>::toPointMatrix(*data->depthData(), *cb_views.planeInliers());
 
     Scalar mean = 0;
-    for (int p = 0; p < points.size(); ++p)
+    for (Size1 p = 0; p < points.elements(); ++p)
     {
       Scalar d = plane.absDistance(points[p]);
       mean += d;
     }
 
-    mean /= points.size();
+    mean /= points.elements();
 
     const Cloud3 part_points = PCLConversion<Scalar>::toPointMatrix(*part_und_data->depthData(), *cb_views.planeInliers());
 
     Scalar part_mean = 0;
-    for (int p = 0; p < part_points.size(); ++p)
+    for (int p = 0; p < part_points.elements(); ++p)
     {
       Scalar d = plane.absDistance(part_points[p]);
       part_mean += d;
     }
 
-    part_mean /= part_points.size();
+    part_mean /= part_points.elements();
 
     ROS_INFO_STREAM(d_mean << " " << mean << " ** " << und_mean << " ** " << part_mean);
   }

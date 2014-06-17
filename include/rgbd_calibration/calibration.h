@@ -37,27 +37,27 @@ public:
   typedef boost::shared_ptr<Calibration> Ptr;
   typedef boost::shared_ptr<const Calibration> ConstPtr;
 
-  void setColorSensor(const PinholeSensor::Ptr & color_sensor)
+  inline void setColorSensor(const PinholeSensor::Ptr & color_sensor)
   {
     color_sensor_ = color_sensor;
   }
 
-  void setDepthSensor(const KinectDepthSensor<UndistortionModel>::Ptr & depth_sensor)
+  inline void setDepthSensor(const KinectDepthSensor<UndistortionModel>::Ptr & depth_sensor)
   {
     depth_sensor_ = depth_sensor;
   }
 
-  void setCheckerboards(const std::vector<Checkerboard::ConstPtr> & cb_vec)
+  inline void setCheckerboards(const std::vector<Checkerboard::ConstPtr> & cb_vec)
   {
     cb_vec_ = cb_vec;
   }
 
-  void setPublisher(const Publisher::Ptr & publisher)
+  inline void setPublisher(const Publisher::Ptr & publisher)
   {
     publisher_ = publisher;
   }
 
-  void setDownSampleRatio(int ratio)
+  inline void setDownSampleRatio(int ratio)
   {
     assert(ratio > 0);
     ratio_ = ratio;
@@ -69,7 +69,7 @@ public:
   void addTestData(const cv::Mat & image,
                    const PCLCloud3::ConstPtr & cloud);
 
-  void setEstimateInitialTransform(bool estimate_initial_trasform)
+  inline void setEstimateInitialTransform(bool estimate_initial_trasform)
   {
     estimate_initial_trasform_ = estimate_initial_trasform;
   }
@@ -94,29 +94,29 @@ public:
     depth_undistortion_estimation_->setMaxThreads(8);
   }
 
-  void setForceAll(bool force)
+  inline void setForceAll(bool force)
   {
     force_ = force;
   }
 
-  void addCheckerboardViews(const CheckerboardViews::Ptr & rgbd_cb)
+  inline void addCheckerboardViews(const CheckerboardViews::Ptr & rgbd_cb)
   {
     cb_views_vec_.push_back(rgbd_cb);
   }
 
-  void setUndistortionModels(const LUMatrixPCL::Ptr & local_und,
+  inline void setUndistortionModels(const LocalMatrixPCL::Ptr & local_und,
                              const GUMatrixPCL::Ptr & global_und)
   {
     local_und_ = local_und;
     global_und_ = global_und;
   }
 
-  void setLocalUndistortionModel(const LUMatrixModel::Ptr & model)
+  inline void setLocalUndistortionModel(const LocalModel::Ptr & model)
   {
-    local_und_ = boost::make_shared<LUMatrixPCL>(model);
+    local_und_ = boost::make_shared<LocalMatrixPCL>(model);
   }
 
-  void setGlobalUndistortionModel(const GUMatrixModel::Ptr & model)
+  inline void setGlobalUndistortionModel(const GUMatrixModel::Ptr & model)
   {
     global_und_ = boost::make_shared<GUMatrixPCL>(model);
   }
@@ -149,7 +149,7 @@ protected:
   bool force_;
   int ratio_;
 
-  LUMatrixPCL::Ptr local_und_;
+  LocalMatrixPCL::Ptr local_und_;
   GUMatrixPCL::Ptr global_und_;
 
   DepthUndistortionEstimation::Ptr depth_undistortion_estimation_;

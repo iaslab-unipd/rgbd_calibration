@@ -287,7 +287,7 @@ public:
 
     typename Types<T>::Transform checkerboard_pose_eigen = checkerboard_t * checkerboard_r;
 
-    typename Types<T>::Cloud3 cb_corners(checkerboard_->cols(), checkerboard_->rows());
+    typename Types<T>::Cloud3 cb_corners(checkerboard_->corners().size());
     cb_corners.container() = checkerboard_pose_eigen * checkerboard_->corners().container().cast<T>();
 
     typename Types<T>::Plane depth_plane(depth_plane_.normal().cast<T>(), T(depth_plane_.offset()));
@@ -297,7 +297,7 @@ public:
 
     Polynomial<T, 2> depth_error_function(depth_error_function_.coefficients().cast<T>());
 
-    for (size_t i = 0; i < cb_corners.size(); ++i)
+    for (Size1 i = 0; i < cb_corners.elements(); ++i)
     {
       residuals[2 * i] = T((reprojected_corners[i] - image_corners_[i].cast<T>()).norm() / 0.5);
       residuals[2 * i + 1] = T(depth_plane.absDistance(cb_corners[i])
@@ -407,7 +407,7 @@ public:
     typename Types<T>::Pose color_sensor_pose_eigen = toEigen<T>(color_sensor_pose);
     typename Types<T>::Pose checkerboard_pose_eigen = toEigen<T>(checkerboard_pose);
 
-    GUMatrixModel::Data::Ptr global_und_data = boost::make_shared<GUMatrixModel::Data>(2, 2);
+    GUMatrixModel::Data::Ptr global_und_data = boost::make_shared<GUMatrixModel::Data>(Size2(2, 2));
     for (int i = 0; i < 4 * MathTraits<GlobalPolynomial>::Size; ++i)
       global_und_data->container().data()[i] = global_undistortion[i];
 
@@ -417,7 +417,7 @@ public:
 
     GUMatrixEigen global_und(global_und_model);
 
-    typename Types<T>::Cloud3 depth_plane_points(depth_plane_points_.xSize(), depth_plane_points_.ySize());
+    typename Types<T>::Cloud3 depth_plane_points(depth_plane_points_.size());
     depth_plane_points.container() = depth_plane_points_.container().cast<T>();
     global_und.undistort(depth_plane_points);
     typename Types<T>::Plane depth_plane(PlaneFit<T>::fit(depth_plane_points));
@@ -442,7 +442,8 @@ public:
     //      penalty = std::exp(penalty);
 
 
-    typename Types<T>::Cloud3 cb_corners(checkerboard_->cols(), checkerboard_->rows());
+    //typename Types<T>::Cloud3 cb_corners(checkerboard_->cols(), checkerboard_->rows());
+    typename Types<T>::Cloud3 cb_corners(checkerboard_->corners().size());
     cb_corners.container() = checkerboard_pose_eigen * checkerboard_->corners().container().cast<T>();
 
     typename Types<T>::Cloud2 reprojected_corners = camera_model_->project3dToPixel<T>(cb_corners);
@@ -455,7 +456,7 @@ public:
     typename Types<T>::Line line(Types<T>::Point3::Zero(), z11);
     residuals[0] = (line.intersectionPoint(penalty_plane) - z11).norm() / ceres::poly_eval(depth_error_function.coefficients(), T(2.0));
 
-    for (size_t i = 0; i < cb_corners.size(); ++i)
+    for (size_t i = 0; i < cb_corners.size().prod(); ++i)
     {
       residuals[2 * i + 1] = T((reprojected_corners[i] - image_corners_[i].cast<T>()).norm() / 0.5);
       //        residuals[2 * i + 1] = T(

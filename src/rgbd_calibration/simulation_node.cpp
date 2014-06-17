@@ -101,7 +101,7 @@ void SimulationNode::spin()
       Cloud2 image_corners = color_sensor_->cameraModel()->project3dToPixel(real_cb->corners());
 
       std::vector<cv::Point2f> corners;
-      for (size_t c = 0; c < image_corners.size(); ++c)
+      for (Size1 c = 0; c < image_corners.elements(); ++c)
       {
         if (image_corners[c].x() > 0 and image_corners[c].x() < image.cols and image_corners[c].y() > 0
             and image_corners[c].y() < image.rows)
@@ -111,8 +111,8 @@ void SimulationNode::spin()
         image_corners[c].y() += image_noise();
 
       }
-      cv::drawChessboardCorners(image, cv::Size(image_corners.xSize(), image_corners.ySize()), corners,
-                                corners.size() == image_corners.size());
+      cv::drawChessboardCorners(image, cv::Size(image_corners.size().x(), image_corners.size().y()), corners,
+                                corners.size() == image_corners.elements());
 
       //      cv::imshow("AAA", image);
       //      cv::waitKey(100);

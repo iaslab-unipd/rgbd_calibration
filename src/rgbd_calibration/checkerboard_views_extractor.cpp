@@ -60,7 +60,7 @@ size_t CheckerboardViewsExtractor::extract(const RGBDData::ConstPtr & data,
 
     // 1. Extract corners
 
-    Cloud2 image_corners(cb->rows(), cb->cols());
+    Cloud2 image_corners(cb->corners().size());
     if (not finder.find(*cb, image_corners))
     {
       if (force)
