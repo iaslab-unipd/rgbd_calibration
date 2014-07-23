@@ -65,8 +65,7 @@ size_t CheckerboardViewsExtractor::extract(const RGBDData::ConstPtr & data,
     {
       if (force)
       {
-        InteractiveCheckerboardFinder finder2;
-        finder2.setImage(image);
+        InteractiveCheckerboardFinder finder2(image);
         if (not finder2.find(*cb, image_corners))
           continue;
       }
