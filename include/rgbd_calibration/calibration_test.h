@@ -64,14 +64,14 @@ public:
   void addData(const cv::Mat & image,
                const PCLCloud3::ConstPtr & cloud);
 
-  void setLocalUndistortionModel(const LocalModel::Ptr & model)
+  void setLocalModel(const LocalModel::Ptr & model)
   {
-    local_und_ = boost::make_shared<LocalMatrixPCL>(model);
+    local_matrix_ = boost::make_shared<LocalMatrixPCL>(model);
   }
 
-  void setGlobalUndistortionModel(const GUMatrixModel::Ptr & model)
+  void setGlobalModel(const GlobalModel::Ptr & model)
   {
-    global_und_ = boost::make_shared<GUMatrixPCL>(model);
+    global_matrix_ = boost::make_shared<GlobalMatrixPCL>(model);
   }
 
   void publishData() const;
@@ -91,8 +91,8 @@ protected:
 
   int ratio_;
 
-  LocalMatrixPCL::Ptr local_und_;
-  GUMatrixPCL::Ptr global_und_;
+  LocalMatrixPCL::Ptr local_matrix_;
+  GlobalMatrixPCL::Ptr global_matrix_;
 
   std::vector<RGBDData::ConstPtr> data_vec_;
   std::vector<RGBDData::ConstPtr> part_und_data_vec_;

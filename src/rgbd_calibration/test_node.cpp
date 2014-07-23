@@ -54,12 +54,12 @@ TestNode::TestNode(ros::NodeHandle & node_handle)
     ROS_FATAL("Missing \"camera_pose\" parameter!!");
 
   if (node_handle_.hasParam("local_und_matrix_file"))
-    node_handle_.getParam("local_und_matrix_file", local_und_matrix_file_);
+    node_handle_.getParam("local_und_matrix_file", local_matrix_file_);
   else
     ROS_FATAL("Missing \"local_und_matrix_file\" parameter!!");
 
   if (node_handle_.hasParam("global_und_matrix_file"))
-    node_handle_.getParam("global_und_matrix_file", global_und_matrix_file_);
+    node_handle_.getParam("global_und_matrix_file", global_matrix_file_);
   else
     ROS_FATAL("Missing \"global_und_matrix_file\" parameter!!");
 
@@ -78,6 +78,12 @@ TestNode::TestNode(ros::NodeHandle & node_handle)
   node_handle_.param("cloud_filename", cloud_filename_, std::string("cloud_"));
 
   node_handle_.param("only_show", only_show_, false);
+
+  int images_size_x, images_size_y;
+  node_handle_.param("depth_image/cols", images_size_x, 640);
+  node_handle_.param("depth_image/rows", images_size_y, 480);
+  images_size_.x() = images_size_x;
+  images_size_.y() = images_size_y;
 
 }
 
@@ -107,37 +113,33 @@ bool TestNode::initialize()
   color_sensor_->setParent(depth_sensor_);
   color_sensor_->transform(camera_pose_);
 
-  double local_fov_x, local_fov_y;
   LocalModel::Data::Ptr local_und_data;
 
   PolynomialUndistortionMatrixIO<LocalPolynomial> local_io;
-  if (not local_io.read(local_und_data, local_und_matrix_file_, local_fov_x, local_fov_y))
-    ROS_FATAL_STREAM("File " << local_und_matrix_file_ << " not found!!");
+  if (not local_io.read(local_und_data, local_matrix_file_))
+    ROS_FATAL_STREAM("File " << local_matrix_file_ << " not found!!");
 
-  double global_fov_x, global_fov_y;
-  GUMatrixModel::Data::Ptr global_und_data;
+  GlobalModel::Data::Ptr global_data;
 
   PolynomialUndistortionMatrixIO<GlobalPolynomial> global_io;
-  if (not global_io.read(global_und_data, global_und_matrix_file_, global_fov_x, global_fov_y))
-    ROS_FATAL_STREAM("File " << global_und_matrix_file_ << " not found!!");
+  if (not global_io.read(global_data, global_matrix_file_))
+    ROS_FATAL_STREAM("File " << global_matrix_file_ << " not found!!");
 
-  LocalModel::Ptr local_und_model = boost::make_shared<LocalModel>();
-  local_und_model->setData(local_und_data);
-  local_und_model->setFieldOfView(local_fov_x, local_fov_y);
+  LocalModel::Ptr local_model = boost::make_shared<LocalModel>(images_size_);
+  local_model->setMatrix(local_und_data);
 
   LocalMatrixPCL::Ptr local_und = boost::make_shared<LocalMatrixPCL>();
-  local_und->setModel(local_und_model);
+  local_und->setModel(local_model);
 
-  GUMatrixModel::Ptr global_und_model = boost::make_shared<GUMatrixModel>();
-  global_und_model->setData(global_und_data);
-  global_und_model->setFieldOfView(global_fov_x, global_fov_y);
+  GlobalModel::Ptr global_model = boost::make_shared<GlobalModel>(images_size_);
+  global_model->setMatrix(global_data);
 
-  GUMatrixPCL::Ptr global_und = boost::make_shared<GUMatrixPCL>();
-  global_und->setModel(global_und_model);
+  GlobalMatrixPCL::Ptr global_matrix = boost::make_shared<GlobalMatrixPCL>();
+  global_matrix->setModel(global_model);
 
   UndistortionModel::Ptr model = boost::make_shared<UndistortionModel>();
-  model->setLocalModel(local_und_model);
-  model->setGlobalModel(global_und_model);
+  model->setLocalModel(local_model);
+  model->setGlobalModel(global_model);
 
 //  UndistortionPCL::Ptr undistortion = boost::make_shared<UndistortionPCL>();
 //  undistortion->setModel(model);
@@ -151,8 +153,8 @@ bool TestNode::initialize()
   test_->setCheckerboards(cb_vec_);
   test_->setDepthSensor(depth_sensor_);
   test_->setColorSensor(color_sensor_);
-  test_->setLocalUndistortionModel(local_und_model);
-  test_->setGlobalUndistortionModel(global_und_model);
+  test_->setLocalModel(local_model);
+  test_->setGlobalModel(global_model);
   test_->setPublisher(publisher_);
   test_->setDownSampleRatio(downsample_ratio_);
 

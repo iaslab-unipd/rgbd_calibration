@@ -59,7 +59,6 @@ void CheckerboardViews::setPlaneInliers(const pcl::IndicesConstPtr & plane_inlie
   depth_view_->setPoints(PCLConversion<Scalar>::toPointMatrix(*data_->depthData(), *plane_inliers));
   depth_view_->setSensor(data_->depthSensor());
   depth_view_->setObject(checkerboard_);
-  depth_view_->setPointsStdDev(inliers_std_dev);
 
   depth_plane_ = boost::make_shared<PlanarObject>();
   depth_plane_->setParent(data_->depthSensor());
@@ -82,7 +81,6 @@ void CheckerboardViews::setPlaneInliers(const PlaneInfo & plane_info)
   depth_view_->setPoints(PCLConversion<Scalar>::toPointMatrix(*data_->depthData(), *plane_info.indices_));
   depth_view_->setSensor(data_->depthSensor());
   depth_view_->setObject(checkerboard_);
-  depth_view_->setPointsStdDev(plane_info.std_dev_);
 
   depth_plane_ = boost::make_shared<PlanarObject>();
   depth_plane_->setParent(data_->depthSensor());

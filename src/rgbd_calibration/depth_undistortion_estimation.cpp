@@ -35,7 +35,7 @@
 #include <calibration_common/base/pcl_conversion.h>
 
 #include <rgbd_calibration/checkerboard_views.h>
-#include <calibration_common/algorithms/plane_extractor.h>
+#include <calibration_common/algorithms/plane_extraction.h>
 #include <rgbd_calibration/depth_undistortion_estimation.h>
 
 #define RGBD_INFO(id, msg) ROS_INFO_STREAM("RGBD " << id << ": " << msg)
@@ -50,7 +50,7 @@ bool DepthUndistortionEstimation::extractPlane(const Checkerboard & color_cb,
                                                PlaneInfo & plane_info)
 {
   Scalar radius = std::min(color_cb.width(), color_cb.height()) / 1.8; // TODO Add parameter
-  PointPlaneExtractor<PCLPoint3> plane_extractor;
+  PointPlaneExtraction<PCLPoint3> plane_extractor;
   plane_extractor.setInputCloud(cloud);
   plane_extractor.setRadius(radius);
 
@@ -85,14 +85,20 @@ void DepthUndistortionEstimation::estimateLocalModel()
       // Estimate center
       Point3 und_color_cb_center = gt_cb.center();
 #pragma omp critical
-      inverse_global_fit_->model()->undistort(und_color_cb_center);
+      {
+        InverseGlobalMatrixEigen inverse_global(inverse_global_fit_->model());
+        inverse_global.undistort(0, 0, und_color_cb_center);
+      }
 
       RGBD_INFO(i + th, "Transformed z: " << gt_cb.center().z() << " -> " << und_color_cb_center.z());
 
       // Undistort cloud
       PCLCloud3::Ptr und_cloud = boost::make_shared<PCLCloud3>(cloud);
 #pragma omp critical
-      local_fit_->model()->undistort(*und_cloud);
+      {
+        LocalMatrixPCL local(local_fit_->model());
+        local.undistort(*und_cloud);
+      }
 
       // Extract plane from undistorted cloud
       PlaneInfo plane_info;
@@ -100,19 +106,17 @@ void DepthUndistortionEstimation::estimateLocalModel()
       {
         RGBD_INFO(i + th, "Plane extracted!!");
 
-        Plane fitted_plane =
-            PlaneFit<Scalar>::robustFit(PCLConversion<Scalar>::toPointMatrix(cloud, *plane_info.indices_),
-                                        plane_info.std_dev_);
+        Plane fitted_plane = PlaneFit<Scalar>::robustFit(PCLConversion<Scalar>::toPointMatrix(cloud, *plane_info.indices_),
+                                                         plane_info.std_dev_);
 
 #pragma omp critical
         {
           local_fit_->accumulateCloud(cloud, *plane_info.indices_);
           local_fit_->addAccumulatedPoints(fitted_plane);
-          for (size_t c = 0; c < gt_cb.corners().size().prod(); ++c)
+          for (Size1 c = 0; c < gt_cb.corners().elements(); ++c)
           {
             const Point3 & corner = gt_cb.corners()[c];
-            Line line(corner, Point3::UnitZ());
-            inverse_global_fit_->addPoint(corner, plane_info.plane_);
+            inverse_global_fit_->addPoint(0, 0, corner, plane_info.plane_);
           }
           if (i + th > 20)
             inverse_global_fit_->update();
@@ -131,7 +135,6 @@ void DepthUndistortionEstimation::estimateLocalModel()
     }
 
     local_fit_->update();
-
   }
 
 }
@@ -146,10 +149,12 @@ void DepthUndistortionEstimation::estimateGlobalModel()
     const PCLCloud3 & cloud = *data.cloud_;
 
     Point3 und_color_cb_center = gt_cb.center();
-    inverse_global_fit_->model()->undistort(und_color_cb_center);
+    InverseGlobalMatrixEigen inverse_global(inverse_global_fit_->model());
+    inverse_global.undistort(0, 0, und_color_cb_center);
 
     PCLCloud3::Ptr und_cloud = boost::make_shared<PCLCloud3>(cloud);
-    local_fit_->model()->undistort(*und_cloud);
+    LocalMatrixPCL local(local_fit_->model());
+    local.undistort(*und_cloud);
 
     PlaneInfo plane_info;
 

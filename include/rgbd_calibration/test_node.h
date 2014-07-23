@@ -73,8 +73,8 @@ protected:
 
   Pose camera_pose_;
 
-  std::string local_und_matrix_file_;
-  std::string global_und_matrix_file_;
+  std::string local_matrix_file_;
+  std::string global_matrix_file_;
 
   int downsample_ratio_;
 
@@ -94,6 +94,8 @@ protected:
   bool only_show_;
 
   CalibrationTest::Ptr test_;
+
+  Size2 images_size_;
 
 };
 

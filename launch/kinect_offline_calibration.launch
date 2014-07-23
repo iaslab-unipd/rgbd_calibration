@@ -11,7 +11,7 @@
     <arg name="image_filename"        default="image_" />
     <arg name="cloud_filename"        default="cloud_" />
 
-    <arg name="camera_name"           default="rgb_A00367A01433047A" />
+    <arg name="camera_name"           default="rgb_PS1080_PrimeSense" /> <!-- default="rgb_A00367A01433047A" -->
     <arg name="camera_type"           default="pinhole" />
     <arg name="camera_calib_url"      default="file://$(env HOME)/.ros/camera_info/$(arg camera_name).yaml" />
 

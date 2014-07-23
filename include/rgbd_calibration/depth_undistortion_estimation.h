@@ -1,18 +1,29 @@
 /*
- *  Copyright (C) 2013 - Filippo Basso <bassofil@dei.unipd.it>
+ *  Copyright (c) 2013-2014, Filippo Basso <bassofil@dei.unipd.it>
  *
- *  This program is free software: you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation, either version 3 of the License, or
- *  (at your option) any later version.
+ *  All rights reserved.
  *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
+ *  Redistribution and use in source and binary forms, with or without
+ *  modification, are permitted provided that the following conditions are met:
+ *     1. Redistributions of source code must retain the above copyright
+ *        notice, this list of conditions and the following disclaimer.
+ *     2. Redistributions in binary form must reproduce the above copyright
+ *        notice, this list of conditions and the following disclaimer in the
+ *        documentation and/or other materials provided with the distribution.
+ *     3. Neither the name of the copyright holder(s) nor the
+ *        names of its contributors may be used to endorse or promote products
+ *        derived from this software without specific prior written permission.
  *
- *  You should have received a copy of the GNU General Public License
- *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ *  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ *  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDER> BE LIABLE FOR ANY
+ *  DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ *  (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ *  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ *  ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ *  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #ifndef RGBD_CALIBRATION_DEPTH_UNDISTORTION_ESTIMATION_H_
@@ -20,7 +31,7 @@
 
 #include <pcl/pcl_base.h>
 #include <calibration_common/objects/checkerboard.h>
-#include <calibration_common/algorithms/plane_extractor.h>
+#include <calibration_common/algorithms/plane_extraction.h>
 #include <calibration_common/depth/undistortion_model_fit.h>
 #include <rgbd_calibration/globals.h>
 #include <rgbd_calibration/publisher.h>
@@ -54,8 +65,8 @@ public:
 
   struct OrderByDistance
   {
-    bool operator()(const DepthData::Ptr & lhs,
-                    const DepthData::Ptr & rhs)
+    inline bool operator()(const DepthData::Ptr & lhs,
+                           const DepthData::Ptr & rhs)
     {
       return lhs->checkerboard_->corners().container().row(2).maxCoeff()
           < rhs->checkerboard_->corners().container().row(2).maxCoeff();
@@ -71,27 +82,29 @@ public:
     // Do nothing
   }
 
-  void setLocalUndistortionModelFit(const LUndMatrixFitPCL::Ptr & local_fit)
+  inline void setLocalModel(const LocalModel::Ptr & local_model)
   {
-    local_fit_ = local_fit;
+    local_model_ = local_model;
+    local_fit_ = boost::make_shared<LocalMatrixFitPCL>(local_model_);
   }
 
-  void setGlobalUndistortionModelFit(const GUMatrixFitPCL::Ptr & global_fit)
+  inline void setGlobalModel(const GlobalModel::Ptr & global_model)
   {
-    global_fit_ = global_fit;
-    UFunctionData::Ptr data =
-        boost::make_shared<UFunctionData>(GlobalPolynomial::IdentityCoefficients());
-    UFunctionEigen::Ptr inv_global_und = boost::make_shared<UFunctionEigen>(data);
-    inverse_global_fit_ = boost::make_shared<UFunctionFitEigen>(inv_global_und);
+    global_model_ = global_model;
+    global_fit_ = boost::make_shared<GlobalMatrixFitPCL>(global_model_);
+    InverseGlobalModel::Data::Ptr matrix = boost::make_shared<InverseGlobalModel::Data>(Size2(1, 1), GlobalPolynomial::IdentityCoefficients());
+    inverse_global_model_ = boost::make_shared<InverseGlobalModel>(global_model_->imageSize());
+    inverse_global_model_->setMatrix(matrix);
+    inverse_global_fit_ = boost::make_shared<InverseGlobalMatrixFitEigen>(inverse_global_model_);
   }
 
-  void addDepthData(const DepthData::Ptr & data)
+  inline void addDepthData(const DepthData::Ptr & data)
   {
     data_vec_.push_back(data);
   }
 
-  const DepthData::Ptr & addDepthData(const PCLCloud3::ConstPtr & cloud,
-                                      const Checkerboard::ConstPtr & checkerboard)
+  inline const DepthData::Ptr & addDepthData(const PCLCloud3::ConstPtr & cloud,
+                                             const Checkerboard::ConstPtr & checkerboard)
   {
     DepthData::Ptr data = boost::make_shared<DepthData>();
     data->cloud_ = cloud;
@@ -100,47 +113,40 @@ public:
     return data_vec_.back();
   }
 
-  void setDepthData(const std::vector<DepthData::Ptr> & data_vec)
+  inline void setDepthData(const std::vector<DepthData::Ptr> & data_vec)
   {
     data_vec_ = data_vec;
   }
-
-  //  const std::vector<DepthData::Ptr> & depthData()
-  //  {
-  //    return data_vec_;
-  //  }
 
   void estimateLocalModel();
 
   void estimateGlobalModel();
 
-  void setMaxThreads(size_t max_threads)
+  inline void setMaxThreads(size_t max_threads)
   {
     assert(max_threads > 0);
     max_threads_ = max_threads;
   }
 
-  Eigen::Matrix<Scalar, Eigen::Dynamic, 3> getLocalSamples(size_t x_index,
-                                                           size_t y_index) const
+  Eigen::Matrix<Scalar, Eigen::Dynamic, 3> getLocalSamples(Size1 x_index,
+                                                           Size1 y_index) const
   {
     const std::vector<std::pair<Scalar, Scalar> > & samples = local_fit_->getSamples(x_index, y_index);
-
     Eigen::Matrix<Scalar, Eigen::Dynamic, 3> eigen_samples(samples.size(), 3);
 
-    for (size_t i = 0; i < samples.size(); ++i)
+    for (Size1 i = 0; i < samples.size(); ++i)
       eigen_samples.row(i) << samples[i].first, samples[i].second, samples[i].first - samples[i].second;
 
     return eigen_samples;
   }
 
-  Eigen::Matrix<Scalar, Eigen::Dynamic, 3> getGlobalSamples(size_t x_index,
-                                                            size_t y_index) const
+  Eigen::Matrix<Scalar, Eigen::Dynamic, 3> getGlobalSamples(Size1 x_index,
+                                                            Size1 y_index) const
   {
     const std::vector<std::pair<Scalar, Scalar> > & samples = global_fit_->getSamples(x_index, y_index);
-
     Eigen::Matrix<Scalar, Eigen::Dynamic, 3> eigen_samples(samples.size(), 3);
 
-    for (size_t i = 0; i < samples.size(); ++i)
+    for (Size1 i = 0; i < samples.size(); ++i)
       eigen_samples.row(i) << samples[i].first, samples[i].second, samples[i].first - samples[i].second;
 
     return eigen_samples;
@@ -153,11 +159,16 @@ private:
                     const Point3 & color_cb_center,
                     PlaneInfo & plane_info);
 
-  size_t max_threads_;
+  Size1 max_threads_;
 
-  LUndMatrixFitPCL::Ptr local_fit_;
-  GUMatrixFitPCL::Ptr global_fit_;
-  UFunctionFitEigen::Ptr inverse_global_fit_;
+  LocalModel::Ptr local_model_;
+  LocalMatrixFitPCL::Ptr local_fit_;
+
+  GlobalModel::Ptr global_model_;
+  GlobalMatrixFitPCL::Ptr global_fit_;
+
+  InverseGlobalModel::Ptr inverse_global_model_;
+  InverseGlobalMatrixFitEigen::Ptr inverse_global_fit_;
 
   std::vector<DepthData::Ptr> data_vec_;
 

@@ -1,52 +1,61 @@
 /*
- *  Copyright (C) 2013 - Filippo Basso <bassofil@dei.unipd.it>
+ *  Copyright (c) 2013-2014, Filippo Basso <bassofil@dei.unipd.it>
  *
- *  This program is free software: you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation, either version 3 of the License, or
- *  (at your option) any later version.
+ *  All rights reserved.
  *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
+ *  Redistribution and use in source and binary forms, with or without
+ *  modification, are permitted provided that the following conditions are met:
+ *     1. Redistributions of source code must retain the above copyright
+ *        notice, this list of conditions and the following disclaimer.
+ *     2. Redistributions in binary form must reproduce the above copyright
+ *        notice, this list of conditions and the following disclaimer in the
+ *        documentation and/or other materials provided with the distribution.
+ *     3. Neither the name of the copyright holder(s) nor the
+ *        names of its contributors may be used to endorse or promote products
+ *        derived from this software without specific prior written permission.
  *
- *  You should have received a copy of the GNU General Public License
- *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ *  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ *  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDER> BE LIABLE FOR ANY
+ *  DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ *  (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ *  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ *  ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ *  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include <rgbd_calibration/checkerboard_views_extractor.h>
 
-#include <calibration_common/algorithms/plane_extractor.h>
+#include <calibration_common/algorithms/plane_extraction.h>
 #include <calibration_common/algorithms/interactive_checkerboard_finder.h>
 #include <calibration_common/algorithms/automatic_checkerboard_finder.h>
 
 namespace calibration
 {
 
-size_t CheckerboardViewsExtractor::extract(const RGBDData::ConstPtr & data,
+Size1 CheckerboardViewsExtraction::extract(const RGBDData::ConstPtr & data,
                                            std::vector<CheckerboardViews::Ptr> & cb_views_vec,
                                            bool interactive,
                                            bool force) const
 {
-  size_t added = 0;
+  Size1 added = 0;
 
   cv::Mat image = data->colorData().clone();
   AutomaticCheckerboardFinder finder;
   finder.setImage(image);
 
-  PointPlaneExtractor<PCLPoint3>::Ptr plane_extractor;
+  PointPlaneExtraction<PCLPoint3>::Ptr plane_extractor;
 
   if (not interactive)
-    plane_extractor = boost::make_shared<PointPlaneExtractor<PCLPoint3> >();
+    plane_extractor = boost::make_shared<PointPlaneExtraction<PCLPoint3> >();
   else
-    plane_extractor = boost::make_shared<PointPlaneExtractorGUI<PCLPoint3> >();
+    plane_extractor = boost::make_shared<PointPlaneExtractionGUI<PCLPoint3> >();
 
   plane_extractor->setInputCloud(data->depthData());
 
-  //int base_id = data->id() * cb_vec_.size();
-
-  for (size_t c = 0; c < cb_vec_.size(); ++c)
+  for (Size1 c = 0; c < cb_vec_.size(); ++c)
   {
     const Checkerboard::ConstPtr & cb = cb_vec_[c];
 
@@ -119,13 +128,13 @@ size_t CheckerboardViewsExtractor::extract(const RGBDData::ConstPtr & data,
 
 }
 
-size_t CheckerboardViewsExtractor::extract(std::vector<CheckerboardViews::Ptr> & cb_views_vec,
-                                           bool interactive) const
+Size1 CheckerboardViewsExtraction::extract(std::vector<CheckerboardViews::Ptr> & cb_views_vec,
+                                            bool interactive) const
 {
   return extract(data_, cb_views_vec, interactive, true);
 }
 
-size_t CheckerboardViewsExtractor::extractAll(std::vector<CheckerboardViews::Ptr> & cb_views_vec,
+Size1 CheckerboardViewsExtraction::extractAll(std::vector<CheckerboardViews::Ptr> & cb_views_vec,
                                               bool interactive) const
 {
   size_t added = 0;

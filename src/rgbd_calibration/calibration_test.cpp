@@ -67,7 +67,7 @@ void CalibrationTest::addData(const cv::Mat & image,
   data->setDepthData(*new_cloud);
 
   PCLCloud3::Ptr part_und_cloud = boost::make_shared<PCLCloud3>(*new_cloud);
-  local_und_->undistort(*part_und_cloud);
+  local_matrix_->undistort(*part_und_cloud);
 
   RGBDData::Ptr part_und_data(boost::make_shared<RGBDData>(index));
   part_und_data->setColorSensor(color_sensor_);
@@ -76,7 +76,7 @@ void CalibrationTest::addData(const cv::Mat & image,
   part_und_data->setDepthData(*part_und_cloud);
 
   PCLCloud3::Ptr und_cloud = boost::make_shared<PCLCloud3>(*part_und_cloud);
-  global_und_->undistort(*und_cloud);
+  global_matrix_->undistort(*und_cloud);
 
   RGBDData::Ptr und_data(boost::make_shared<RGBDData>(index));
   und_data->setColorSensor(color_sensor_);
@@ -132,7 +132,7 @@ void CalibrationTest::testPlanarityError() const
 {
   std::vector<CheckerboardViews::Ptr> cb_views_vec;
 
-  CheckerboardViewsExtractor cb_extractor;
+  CheckerboardViewsExtraction cb_extractor;
   cb_extractor.setColorSensorPose(color_sensor_->pose());
   cb_extractor.setCheckerboardVector(cb_vec_);
   cb_extractor.setInputData(und_data_vec_);
@@ -250,7 +250,7 @@ void CalibrationTest::testCheckerboardError() const
 {
   std::vector<CheckerboardViews::Ptr> cb_views_vec;
 
-  CheckerboardViewsExtractor cb_extractor;
+  CheckerboardViewsExtraction cb_extractor;
   cb_extractor.setColorSensorPose(color_sensor_->pose());
   cb_extractor.setCheckerboardVector(cb_vec_);
   cb_extractor.setInputData(und_data_vec_);

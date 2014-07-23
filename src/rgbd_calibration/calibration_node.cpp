@@ -31,10 +31,20 @@ CalibrationNode::CalibrationNode(ros::NodeHandle & node_handle)
   node_handle_.param("camera_name", camera_name_, std::string("camera"));
 
   node_handle_.param("estimate_depth_distortion", estimate_depth_distortion_, true); // TODO default = false
-  //  node_handle_.param("distortion/cols", distortion_cols_, 640); // TODO rename
-  //  node_handle_.param("distortion/rows", distortion_rows_, 480); // TODO rename
-  node_handle_.param("distortion/cols", distortion_cols_, 80); // TODO rename
-  node_handle_.param("distortion/rows", distortion_rows_, 60); // TODO rename
+//  node_handle_.param("distortion/cols", distortion_cols_, 80); // TODO rename
+//  node_handle_.param("distortion/rows", distortion_rows_, 60); // TODO rename
+  int matrix_size_x, matrix_size_y;
+  node_handle_.param("undistortion_matrix/cols", matrix_size_x, 81);
+  node_handle_.param("undistortion_matrix/rows", matrix_size_y, 61);
+  matrix_size_.x() = matrix_size_x;
+  matrix_size_.y() = matrix_size_y;
+
+  int images_size_x, images_size_y;
+  node_handle_.param("depth_image/cols", images_size_x, 640);
+  node_handle_.param("depth_image/rows", images_size_y, 480);
+  images_size_.x() = images_size_x;
+  images_size_.y() = images_size_y;
+
   node_handle_.param("downsample_ratio", downsample_ratio_, 1);
   if (downsample_ratio_ < 1)
   {
@@ -102,40 +112,24 @@ bool CalibrationNode::initialize()
 
   if (estimate_depth_distortion_)
   {
-    const Scalar fov_x = Scalar(DEG2RAD(KINECT_FOV_X)); // TODO add parameter
-    const Scalar fov_y = Scalar(DEG2RAD(KINECT_FOV_Y)); // TODO add parameter
+    LocalModel::Data::Ptr local_matrix = boost::make_shared<LocalModel::Data>(matrix_size_, LocalPolynomial::IdentityCoefficients());
 
-    LocalModel::Data::Ptr local_und_data =
-      boost::make_shared<LocalModel::Data>(Size2(distortion_cols_, distortion_rows_), LocalPolynomial::IdentityCoefficients());
+    LocalModel::Ptr local_model = boost::make_shared<LocalModel>(images_size_);
+    local_model->setMatrix(local_matrix);
 
-    LocalModel::Ptr local_und_model = boost::make_shared<LocalModel>();
-    local_und_model->setData(local_und_data);
-    local_und_model->setFieldOfView(fov_x, fov_y);
+    GlobalModel::Data::Ptr global_data = boost::make_shared<GlobalModel::Data>(Size2(2, 2), GlobalPolynomial::IdentityCoefficients());
 
-//    LUMatrixPCL::Ptr local_und = boost::make_shared<LUMatrixPCL>();
-//    local_und->setModel(local_und_model);
-
-    GUMatrixModel::Data::Ptr global_und_data =
-      boost::make_shared<GUMatrixModel::Data>(Size2(2, 2), GlobalPolynomial::IdentityCoefficients());
-
-    GUMatrixModel::Ptr global_und_model = boost::make_shared<GUMatrixModel>();
-    global_und_model->setData(global_und_data);
-    global_und_model->setFieldOfView(2 * fov_x, 2 * fov_y);
-
-//    GUMatrixPCL::Ptr global_und = boost::make_shared<GUMatrixPCL>();
-//    global_und->setModel(global_und_model);
+    GlobalModel::Ptr global_model = boost::make_shared<GlobalModel>(images_size_);
+    global_model->setMatrix(global_data);
 
     UndistortionModel::Ptr model = boost::make_shared<UndistortionModel>();
-    model->setLocalModel(local_und_model);
-    model->setGlobalModel(global_und_model);
-
-//    UndistortionPCL::Ptr undistortion = boost::make_shared<UndistortionPCL>();
-//    undistortion->setModel(model);
+    model->setLocalModel(local_model);
+    model->setGlobalModel(global_model);
 
     depth_sensor_->setUndistortionModel(model);
 
-    calibration_->setLocalUndistortionModel(local_und_model);
-    calibration_->setGlobalUndistortionModel(global_und_model);
+    calibration_->setLocalModel(local_model);
+    calibration_->setGlobalModel(global_model);
     calibration_->setEstimateDepthUndistortionModel(true);
   }
 

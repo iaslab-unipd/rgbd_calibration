@@ -22,7 +22,7 @@
 #include <calibration_common/objects/globals.h>
 #include <calibration_common/depth/depth.h>
 
-#include <kinect/depth/polynomial_function_fit.h>
+//#include <kinect/depth/polynomial_function_fit.h>
 #include <kinect/depth/polynomial_matrix_fit.h>
 #include <kinect/depth/two_steps_undistortion.h>
 
@@ -35,42 +35,44 @@
 #define L_POLY_DEGREE 2
 #define L_POLY_MIN_DEGREE 0
 
-#define KINECT_FOV_X 58.6 //Scalar(DEG2RAD(57.0)) 58.6
-#define KINECT_FOV_Y 45.7 //Scalar(DEG2RAD(43.5)) 45.7
+//#define KINECT_FOV_X 58.6 //Scalar(DEG2RAD(57.0)) 58.6
+//#define KINECT_FOV_Y 45.7 //Scalar(DEG2RAD(43.5)) 45.7
 
 #define KINECT_ERROR_POLY Vector3(0.0, 0.0, 0.0035)
 
 namespace calibration
 {
 
-typedef Polynomial<Scalar, L_POLY_DEGREE, L_POLY_MIN_DEGREE> LocalPolynomial;
-typedef Polynomial<Scalar, G_POLY_DEGREE, G_POLY_MIN_DEGREE> GlobalPolynomial;
+typedef Polynomial<Scalar, L_POLY_DEGREE, L_POLY_MIN_DEGREE>  LocalPolynomial;
+typedef Polynomial<Scalar, G_POLY_DEGREE, G_POLY_MIN_DEGREE>  GlobalPolynomial;
 
-typedef PolynomialMatrixProjectedModel<LocalPolynomial> LocalModel;
+typedef PolynomialMatrixSmoothModel<LocalPolynomial>                        LocalModel;
+typedef PolynomialMatrixPCL<LocalModel, Scalar, PCLPoint3>                  LocalMatrixPCL;
+typedef PolynomialMatrixEigen<LocalModel, Scalar>                           LocalMatrixEigen;
+typedef PolynomialMatrixModelFitPCL<LocalModel, Scalar, PCLPoint3>          LocalMatrixFitPCL;
+typedef PolynomialMatrixModelFitEigen<LocalModel, Scalar>                   LocalMatrixFitEigen;
 
-typedef DepthUndistortionImpl<LocalModel, DepthPCL> LocalMatrixPCL;
-typedef DepthUndistortionImpl<LocalModel, DepthEigen> LocalMatrixEigen;
+typedef PolynomialMatrixSmoothModel<GlobalPolynomial>                       GlobalModel;
+typedef PolynomialMatrixPCL<GlobalModel, Scalar, PCLPoint3>                 GlobalMatrixPCL;
+typedef PolynomialMatrixEigen<GlobalModel, Scalar>                          GlobalMatrixEigen;
+typedef PolynomialMatrixModelFitPCL<GlobalModel, Scalar, PCLPoint3>         GlobalMatrixFitPCL;
+typedef PolynomialMatrixModelFitEigen<GlobalModel, Scalar>                  GlobalMatrixFitEigen;
 
-typedef PolynomialUndistortionMatrixFitPCL<LocalPolynomial, PCLPoint3> LUndMatrixFitPCL;
-typedef PolynomialUndistortionMatrixFitEigen<LocalPolynomial> LUndMatrixFitEigen;
+typedef PolynomialMatrixSimpleModel<GlobalPolynomial>                       InverseGlobalModel;
+typedef PolynomialMatrixPCL<InverseGlobalModel, Scalar, PCLPoint3>          InverseGlobalMatrixPCL;
+typedef PolynomialMatrixEigen<InverseGlobalModel, Scalar>                   InverseGlobalMatrixEigen;
+typedef PolynomialMatrixModelFitPCL<InverseGlobalModel, Scalar, PCLPoint3>  InverseGlobalMatrixFitPCL;
+typedef PolynomialMatrixModelFitEigen<InverseGlobalModel, Scalar>           InverseGlobalMatrixFitEigen;
 
-typedef PolynomialMatrixProjectedModel<GlobalPolynomial> GUMatrixModel;
+//typedef PolynomialFunctionModel<GlobalPolynomial>::Data UFunctionData;
+//typedef PolynomialFunctionPCL<GlobalPolynomial, PCLPoint3> UFunctionPCL;
+//typedef PolynomialFunctionEigen<GlobalPolynomial, Scalar> UFunctionEigen;
+//typedef PolynomialFunctionFitPCL<GlobalPolynomial, Scalar, PCLPoint3> UFunctionFitPCL;
+//typedef PolynomialFunctionFitEigen<GlobalPolynomial, Scalar> UFunctionFitEigen;
 
-typedef DepthUndistortionImpl<GUMatrixModel, DepthPCL> GUMatrixPCL;
-typedef DepthUndistortionImpl<GUMatrixModel, DepthEigen> GUMatrixEigen;
-
-typedef PolynomialUndistortionMatrixFitPCL<GlobalPolynomial, PCLPoint3> GUMatrixFitPCL;
-typedef PolynomialUndistortionMatrixFitEigen<GlobalPolynomial> GUMatrixFitEigen;
-
-typedef PolynomialUndistortionFunctionModel<GlobalPolynomial>::Data UFunctionData;
-typedef PolynomialUndistortionFunctionPCL<GlobalPolynomial, PCLPoint3> UFunctionPCL;
-typedef PolynomialUndistortionFunctionEigen<GlobalPolynomial> UFunctionEigen;
-typedef PolynomialUndistortionFunctionFitPCL<GlobalPolynomial, PCLPoint3> UFunctionFitPCL;
-typedef PolynomialUndistortionFunctionFitEigen<GlobalPolynomial> UFunctionFitEigen;
-
-typedef TwoStepsModel<Scalar, LocalModel, GUMatrixModel> UndistortionModel;
-typedef DepthUndistortionImpl<UndistortionModel, DepthEigen> UndistortionEigen;
-typedef DepthUndistortionImpl<UndistortionModel, DepthPCL> UndistortionPCL;
+typedef TwoStepsModel<Scalar, LocalModel, GlobalModel>                      UndistortionModel;
+typedef TwoStepsUndistortionEigen<Scalar, LocalModel, GlobalModel>          UndistortionEigen;
+typedef TwoStepsUndistortionPCL<Scalar, PCLPoint3, LocalModel, GlobalModel> UndistortionPCL;
 
 } /* namespace calibration */
 #endif /* RGBD_CALIBRATION_GLOBALS_H_ */
