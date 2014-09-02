@@ -144,7 +144,7 @@ void CalibrationTest::testPlanarityError() const
     RGBDData::ConstPtr und_data = cb_views.data();
     RGBDData::ConstPtr data = data_map_.at(und_data);
 
-    const Cloud3 & und_points = cb_views.depthView()->points();
+    const Cloud3 & und_points = PCLConversion<Scalar>::toPointMatrix(*cb_views.depthView()->data(), cb_views.depthView()->points());
     Plane und_plane = PlaneFit<Scalar>::fit(und_points);
 
     Scalar d_mean = 0;
@@ -313,7 +313,7 @@ void CalibrationTest::testCheckerboardError() const
     Plane plane = plane_vec[i]; //cb_views.colorCheckerboard()->plane();
     plane.transform(color_sensor_->pose());
 
-    const Cloud3 & und_points = cb_views.depthView()->points();
+    const Cloud3 & und_points = PCLConversion<Scalar>::toPointMatrix(*cb_views.depthView()->data(), cb_views.depthView()->points());
 
     Scalar d_mean = 0;
     Scalar und_mean = 0;

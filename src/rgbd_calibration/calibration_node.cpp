@@ -34,8 +34,8 @@ CalibrationNode::CalibrationNode(ros::NodeHandle & node_handle)
 //  node_handle_.param("distortion/cols", distortion_cols_, 80); // TODO rename
 //  node_handle_.param("distortion/rows", distortion_rows_, 60); // TODO rename
   int matrix_size_x, matrix_size_y;
-  node_handle_.param("undistortion_matrix/cols", matrix_size_x, 81);
-  node_handle_.param("undistortion_matrix/rows", matrix_size_y, 61);
+  node_handle_.param("undistortion_matrix/cols", matrix_size_x, 641);
+  node_handle_.param("undistortion_matrix/rows", matrix_size_y, 481);
   matrix_size_.x() = matrix_size_x;
   matrix_size_.y() = matrix_size_y;
 
@@ -50,6 +50,10 @@ CalibrationNode::CalibrationNode(ros::NodeHandle & node_handle)
   {
     downsample_ratio_ = 1;
     ROS_WARN("\"downsample_ratio\" cannot be < 1. Skipping.");
+  }
+  else
+  {
+    images_size_ /= downsample_ratio_;
   }
 
   if (node_handle_.hasParam("camera_pose"))

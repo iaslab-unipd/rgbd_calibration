@@ -140,6 +140,10 @@ protected:
 
   void optimizeAll(const std::vector<CheckerboardViews::Ptr> & rgbd_cb_vec);
 
+  void addData_(const cv::Mat & image,
+                const PCLCloud3::ConstPtr & cloud,
+                std::vector<RGBDData::ConstPtr> & vec);
+
   PinholeSensor::Ptr color_sensor_;
   KinectDepthSensor<UndistortionModel>::Ptr depth_sensor_;
 

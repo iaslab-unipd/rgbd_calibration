@@ -96,17 +96,17 @@ void Publisher::publish(const CheckerboardViews & rgbd_checkerboard,
     pub_set.marker_pub_.publish(checkerboard_marker);
   }
 
-  if (rgbd_checkerboard.depthPlane())
-  {
-    rgbd_checkerboard.depthPlane()->toMarker(d_plane_marker);
-    pub_set.marker_pub_.publish(d_plane_marker);
-  }
+//  if (rgbd_checkerboard.depthPlane())
+//  {
+//    rgbd_checkerboard.depthPlane()->toMarker(d_plane_marker);
+//    pub_set.marker_pub_.publish(d_plane_marker);
+//  }
 
-  if (rgbd_checkerboard.depthView())
-  {
-    rgbd_checkerboard.depthView()->toMarker(cloud_marker);
-    pub_set.marker_pub_.publish(cloud_marker);
-  }
+//  if (rgbd_checkerboard.depthView())
+//  {
+//    rgbd_checkerboard.depthView()->toMarker(cloud_marker);
+//    pub_set.marker_pub_.publish(cloud_marker);
+//  }
 }
 
 void Publisher::publish(const RGBDData & rgbd)

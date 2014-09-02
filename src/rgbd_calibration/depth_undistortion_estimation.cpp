@@ -56,8 +56,8 @@ bool DepthUndistortionEstimation::extractPlane(const Checkerboard & color_cb,
 
   bool plane_extracted = false;
 
-  int k[5] = {0, 1, -1, 2, -2}; // TODO Add parameter
-  for (size_t i = 0; i < 5 and not plane_extracted; ++i)
+  int k[3] = {0, 1, -1}; // TODO Add parameter
+  for (Size1 i = 0; i < 3 and not plane_extracted; ++i)
   {
     plane_extractor.setPoint(PCLPoint3(center.x(), center.y(), center.z() + radius * k[i]));
     plane_extracted = plane_extractor.extract(plane_info);
@@ -70,10 +70,10 @@ void DepthUndistortionEstimation::estimateLocalModel()
 {
   std::sort(data_vec_.begin(), data_vec_.end(), OrderByDistance());
 
-  for (size_t i = 0; i < data_vec_.size(); i += max_threads_)
+  for (Size1 i = 0; i < data_vec_.size(); i += max_threads_)
   {
 #pragma omp parallel for schedule(static, 1)
-    for (size_t th = 0; th < max_threads_; ++th)
+    for (Size1 th = 0; th < max_threads_; ++th)
     {
       if (i + th >= data_vec_.size())
         continue;
@@ -122,8 +122,8 @@ void DepthUndistortionEstimation::estimateLocalModel()
             inverse_global_fit_->update();
         }
 
-        Line line(gt_cb.center(), Point3::UnitZ());
-        RGBD_INFO(i + th, "Real z: " << line.intersectionPoint(plane_info.plane_).z());
+//        Line line(gt_cb.center(), Point3::UnitZ());
+//        RGBD_INFO(i + th, "Real z: " << line.intersectionPoint(plane_info.plane_).z());
 
 //      Scalar angle = RAD2DEG(std::acos(plane_info.equation_.normal().dot(gt_cb.plane().normal())));
 //      RGBD_INFO(data.id(), "Angle: " << angle);
@@ -174,7 +174,6 @@ void DepthUndistortionEstimation::estimateGlobalModel()
       RGBD_WARN(i, "Plane not extracted!!");
 
   }
-
   global_fit_->update();
 
 }

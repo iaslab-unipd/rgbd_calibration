@@ -35,6 +35,7 @@
 #include <pcl/filters/random_sample.h>
 
 #include <calibration_common/ceres/plane_fit.h>
+#include <calibration_common/base/pcl_conversion.h>
 #include <kinect/depth/polynomial_matrix_io.h>
 
 #include <rgbd_calibration/checkerboard_views_extractor.h>
@@ -99,56 +100,79 @@ void Calibration::publishData() const
 
 }
 
-void Calibration::addData(const cv::Mat & image,
-                          const PCLCloud3::ConstPtr & cloud)
+void Calibration::addData_(const cv::Mat & image,
+                           const PCLCloud3::ConstPtr & cloud,
+                           std::vector<RGBDData::ConstPtr> & vec)
 {
-//  PCLCloud3::Ptr new_cloud(boost::make_shared<PCLCloud3>());
-//  std::vector<int> remapping;
-//  pcl::removeNaNFromPointCloud(*cloud, *new_cloud, remapping);
-
-//  if (ratio_ > 1)
-//  {
-//    pcl::RandomSample<PCLPoint3> random_sample;
-//    random_sample.setInputCloud(new_cloud);
-//    random_sample.setSample(new_cloud->size() / ratio_);
-//    random_sample.setSeed(rand());
-//    random_sample.filter(*new_cloud);
-//  }
-
   RGBDData::Ptr data(boost::make_shared<RGBDData>(data_vec_.size() + 1));
   data->setColorSensor(color_sensor_);
   data->setDepthSensor(depth_sensor_);
   data->setColorData(image);
-//  data->setDepthData(*new_cloud);
-  data->setDepthData(*cloud);
 
-  data_vec_.push_back(data);
+  if (ratio_ > 1)
+  {
+    PCLCloud3::Ptr new_cloud(boost::make_shared<PCLCloud3>());
+    new_cloud->resize(cloud->size() / (ratio_ * ratio_));
+    new_cloud->header = cloud->header;
+    new_cloud->width = cloud->width / ratio_;
+    new_cloud->height = cloud->height / ratio_;
+    new_cloud->is_dense = cloud->is_dense;
+
+    PCLPoint3 zero(0, 0, 0);
+    float nan = std::numeric_limits<float>::quiet_NaN();
+    PCLPoint3 bad_point(nan, nan, nan);
+
+    for (Size1 i = 0; i < new_cloud->height; ++i)
+    {
+      for (Size1 j = 0; j < new_cloud->width; ++j)
+      {
+        new_cloud->at(j, i) = zero;
+        int count = 0;
+        for (Size1 di = 0; di < ratio_; ++di)
+        {
+          for (Size1 dj = 0; dj < ratio_; ++dj)
+          {
+            PCLPoint3 p = cloud->at(j * ratio_ + dj, i * ratio_ + di);
+            if (pcl::isFinite(p))
+            {
+              ++count;
+              new_cloud->at(j, i).x += p.x;
+              new_cloud->at(j, i).y += p.y;
+              new_cloud->at(j, i).z += p.z;
+            }
+          }
+        }
+        if (count > 0)
+        {
+          new_cloud->at(j, i).x /= count;
+          new_cloud->at(j, i).y /= count;
+          new_cloud->at(j, i).z /= count;
+        }
+        else
+        {
+          new_cloud->at(j, i) = bad_point;
+        }
+      }
+    }
+
+    data->setDepthData(*new_cloud);
+  }
+  else
+    data->setDepthData(*cloud);
+
+  vec.push_back(data);
+}
+
+void Calibration::addData(const cv::Mat & image,
+                          const PCLCloud3::ConstPtr & cloud)
+{
+  addData_(image, cloud, data_vec_);
 }
 
 void Calibration::addTestData(const cv::Mat & image,
                               const PCLCloud3::ConstPtr & cloud)
 {
-//  PCLCloud3::Ptr new_cloud(boost::make_shared<PCLCloud3>());
-//  std::vector<int> remapping;
-//  pcl::removeNaNFromPointCloud(*cloud, *new_cloud, remapping);
-
-//  if (ratio_ > 1)
-//  {
-//    pcl::RandomSample<PCLPoint3> random_sample;
-//    random_sample.setInputCloud(new_cloud);
-//    random_sample.setSample(new_cloud->size() / ratio_);
-//    random_sample.setSeed(rand());
-//    random_sample.filter(*new_cloud);
-//  }
-
-  RGBDData::Ptr data(boost::make_shared<RGBDData>(data_vec_.size() + 1));
-  data->setColorSensor(color_sensor_);
-  data->setDepthSensor(depth_sensor_);
-  data->setColorData(image);
-//  data->setDepthData(*new_cloud);
-  data->setDepthData(*cloud);
-
-  test_vec_.push_back(data);
+  addData_(image, cloud, test_vec_);
 }
 
 void Calibration::perform()
@@ -165,7 +189,7 @@ void Calibration::perform()
     cb_extractor.setOnlyImages(true);
     cb_extractor.extractAll(cb_views_vec_);
 
-    for (size_t i = 0; i < cb_views_vec_.size(); ++i)
+    for (Size1 i = 0; i < cb_views_vec_.size(); ++i)
     {
       CheckerboardViews & cb_views = *cb_views_vec_[i];
       Checkerboard::Ptr cb = boost::make_shared<Checkerboard>(*cb_views.colorCheckerboard());
@@ -176,23 +200,23 @@ void Calibration::perform()
     depth_undistortion_estimation_->estimateLocalModel();
     depth_undistortion_estimation_->estimateGlobalModel();
 
-    for (size_t i = 0; i < cb_views_vec_.size(); ++i)
+    for (Size1 i = 0; i < cb_views_vec_.size(); ++i)
     {
       CheckerboardViews & cb_views = *cb_views_vec_[i];
       cb_views.setPlaneInliers(depth_data_vec_[i]->estimated_plane_);
     }
 
-//    PolynomialUndistortionMatrixIO<LocalPolynomial> io;
-//    io.write(*local_und_->model(), "/tmp/local_matrix.txt");
+    PolynomialUndistortionMatrixIO<LocalPolynomial> io;
+    io.write(*local_matrix_->model(), "/tmp/local_matrix.txt");
 
-//    Scalar max;
-//    io.writeImageAuto(*local_und_->model(), Scalar(4.0), "/tmp/matrix4.png", max);
+    Scalar max;
+    io.writeImageAuto(*local_matrix_->model(), Scalar(4.0), "/tmp/matrix4.png", max);
 //    ROS_INFO_STREAM("Max 4: " << max);
-//    io.writeImageAuto(*local_und_->model(), Scalar(3.0), "/tmp/matrix3.png", max);
+    io.writeImageAuto(*local_matrix_->model(), Scalar(3.0), "/tmp/matrix3.png", max);
 //    ROS_INFO_STREAM("Max 3: " << max);
-//    io.writeImageAuto(*local_und_->model(), Scalar(2.0), "/tmp/matrix2.png", max);
+    io.writeImageAuto(*local_matrix_->model(), Scalar(2.0), "/tmp/matrix2.png", max);
 //    ROS_INFO_STREAM("Max 2: " << max);
-//    io.writeImageAuto(*local_und_->model(), Scalar(1.0), "/tmp/matrix1.png", max);
+    io.writeImageAuto(*local_matrix_->model(), Scalar(1.0), "/tmp/matrix1.png", max);
 //    ROS_INFO_STREAM("Max 1: " << max);
 
 //    PolynomialUndistortionMatrixIO<GlobalPolynomial> io2;
@@ -241,9 +265,9 @@ void Calibration::estimateInitialTransform()
 
   std::vector<CheckerboardViews::Ptr> cb_views_vec;
 
-  for (size_t i = 0; i < data_vec_.size() and cb_views_vec.size() < 10; ++i)
+  for (Size1 i = 0; i < data_vec_.size() and cb_views_vec.size() < 10; ++i)
   {
-    size_t index = rand() % data_vec_.size();
+    Size1 index = rand() % data_vec_.size();
     cb_extractor.setInputData(data_vec_[index]);
     cb_extractor.extract(cb_views_vec, true);
   }
@@ -257,7 +281,7 @@ void Calibration::estimateTransform(const std::vector<CheckerboardViews::Ptr> & 
   calib.setMainSensor(depth_sensor_);
   calib.setSize(cb_views_vec.size());
 
-  for (size_t i = 0; i < cb_views_vec.size(); ++i)
+  for (Size1 i = 0; i < cb_views_vec.size(); ++i)
   {
     calib.addData(i, color_sensor_, cb_views_vec[i]->colorCheckerboard());
     calib.addData(i, depth_sensor_, cb_views_vec[i]->depthPlane());
@@ -386,13 +410,15 @@ public:
   TransformDistortionError(const PinholeCameraModel::ConstPtr & camera_model,
                            const Checkerboard::ConstPtr & checkerboard,
                            const Cloud2 & image_corners,
-                           const Cloud3 & depth_plane_points,
+                           const Cloud3 & depth_points,
+                           const Indices & plane_indices,
                            const Polynomial<Scalar, 2> & depth_error_function,
                            const Size2 & images_size)
     : camera_model_(camera_model),
       checkerboard_(checkerboard),
       image_corners_(image_corners),
-      depth_plane_points_(depth_plane_points),
+      depth_points_(depth_points),
+      plane_indices_(plane_indices),
       depth_error_function_(depth_error_function),
       images_size_(images_size)
   {
@@ -434,29 +460,11 @@ public:
 
       GlobalMatrixEigen global(global_model);
 
-      typename Types<T>::Cloud3 depth_plane_points(depth_plane_points_.size());
-      depth_plane_points.container() = depth_plane_points_.container().cast<T>();
+      typename Types<T>::Cloud3 depth_points(depth_points_.size());
+      depth_points.container() = depth_points_.container().cast<T>();
+      global.undistort(depth_points);
 
-      Size1 c = 0;
-      for (int i = 0; i < depth_plane_points.elements(); ++i)
-        if (depth_plane_points[i].hasNaN())
-          c++;
-
-      if (c > 0)
-        ROS_INFO_STREAM("NaN = " << c);
-
-      global.undistort(depth_plane_points);
-
-      Size1 c2 = 0;
-      for (int i = 0; i < depth_plane_points.elements(); ++i)
-        if (depth_plane_points[i].hasNaN())
-          c2++;
-
-      if (c2 > 0)
-        ROS_INFO_STREAM("NaN = " << c << " -> " << c2);
-
-
-      typename Types<T>::Plane depth_plane(PlaneFit<T>::fit(depth_plane_points));
+      typename Types<T>::Plane depth_plane(PlaneFit<T>::fit(typename Types<T>::Cloud3(depth_points, plane_indices_)));
 
       typename Types<T>::Point3 z00(T(-1.0), T(-1.0), T(2.0));
       typename Types<T>::Point3 z01(T(-1.0), T( 1.0), T(2.0));
@@ -477,7 +485,6 @@ public:
 //      penalty /= T(depth_plane_points.size());
 //      penalty = std::exp(penalty);
 
-      //typename Types<T>::Cloud3 cb_corners(checkerboard_->cols(), checkerboard_->rows());
       typename Types<T>::Cloud3 cb_corners(checkerboard_->corners().size());
       cb_corners.container() = checkerboard_pose_eigen * checkerboard_->corners().container().cast<T>();
 
@@ -491,12 +498,10 @@ public:
       typename Types<T>::Line line(Types<T>::Point3::Zero(), z11);
       residuals[0] = (line.intersectionPoint(penalty_plane) - z11).norm() / ceres::poly_eval(depth_error_function.coefficients(), T(2.0));
 
-      for (size_t i = 0; i < cb_corners.size().prod(); ++i)
+      for (Size1 i = 0; i < cb_corners.size().prod(); ++i)
       {
         residuals[2 * i + 1] = T((reprojected_corners[i] - image_corners_[i].cast<T>()).norm() / 0.5);
-//        residuals[2 * i + 1] = T(
-//          depth_plane.absDistance(cb_corners[i]) / ceres::poly_eval(depth_error_function.coefficients(),
-//                                                                    cb_corners[i].z())); // TODO use line-of-sight error
+
         Line line(Point3::Zero(), cb_corners[i]);
         residuals[2 * i + 2] = T((line.intersectionPoint(depth_plane) - cb_corners[i]).norm()
                                  / ceres::poly_eval(depth_error_function.coefficients(), cb_corners[i].z()));
@@ -511,7 +516,8 @@ private:
   const Checkerboard::ConstPtr & checkerboard_;
   const Cloud2 & image_corners_;
 
-  const Cloud3 & depth_plane_points_;
+  const Cloud3 depth_points_;
+  const Indices & plane_indices_;
 
   const Polynomial<Scalar, 2> depth_error_function_;
   const Size2 & images_size_;
@@ -541,6 +547,7 @@ void Calibration::optimizeAll(const std::vector<CheckerboardViews::Ptr> & cb_vie
     TransformDistortionError * error = new TransformDistortionError(color_sensor_->cameraModel(),
                                                                     cb_views.checkerboard(),
                                                                     cb_views.colorView()->points(),
+                                                                    PCLConversion<Scalar>::toPointMatrix(*cb_views.depthView()->data()),
                                                                     cb_views.depthView()->points(),
                                                                     depth_sensor_->depthErrorFunction(),
                                                                     global_model_->imageSize());
@@ -576,13 +583,15 @@ void Calibration::optimizeAll(const std::vector<CheckerboardViews::Ptr> & cb_vie
 
 void Calibration::optimize()
 {
+  ROS_INFO("Optimizing...\n");
+
   if (estimate_depth_und_model_)
   {
     std::vector<CheckerboardViews::Ptr> und_cb_views_vec;
 
     // Create locally undistorted clouds and views
 #pragma omp parallel for
-    for (size_t i = 0; i < cb_views_vec_.size(); ++i)
+    for (Size1 i = 0; i < cb_views_vec_.size(); ++i)
     {
       const CheckerboardViews & cb_views = *cb_views_vec_[i];
       const DepthUndistortionEstimation::DepthData & depth_data = *depth_data_vec_[i];

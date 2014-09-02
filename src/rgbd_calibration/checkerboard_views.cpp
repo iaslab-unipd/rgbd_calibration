@@ -56,7 +56,7 @@ void CheckerboardViews::setPlaneInliers(const pcl::IndicesConstPtr & plane_inlie
   depth_view_ = boost::make_shared<DepthViewPCL<PlanarObject> >();
   depth_view_->setId(id_);
   depth_view_->setData(data_->depthData());
-  depth_view_->setPoints(PCLConversion<Scalar>::toPointMatrix(*data_->depthData(), *plane_inliers));
+  depth_view_->setPoints(*plane_inliers);
   depth_view_->setSensor(data_->depthSensor());
   depth_view_->setObject(checkerboard_);
 
@@ -67,7 +67,7 @@ void CheckerboardViews::setPlaneInliers(const pcl::IndicesConstPtr & plane_inlie
   ss << checkerboard_->frameId() << "_plane_" << id_;
   depth_plane_->setFrameId(ss.str());
 
-  depth_plane_->setPlane(PlaneFit<Scalar>::robustFit(depth_view_->points(), inliers_std_dev));
+  depth_plane_->setPlane(PlaneFit<Scalar>::robustFit(PCLConversion<Scalar>::toPointMatrix(*depth_view_->data(), depth_view_->points()), inliers_std_dev));
   //depth_plane_->setPlane(PlaneFit<Scalar>::fit(depth_view_->points()));
 }
 
@@ -78,7 +78,8 @@ void CheckerboardViews::setPlaneInliers(const PlaneInfo & plane_info)
   depth_view_ = boost::make_shared<DepthViewPCL<PlanarObject> >();
   depth_view_->setId(id_);
   depth_view_->setData(data_->depthData());
-  depth_view_->setPoints(PCLConversion<Scalar>::toPointMatrix(*data_->depthData(), *plane_info.indices_));
+//  depth_view_->setPoints(PCLConversion<Scalar>::toPointMatrix(*data_->depthData(), *plane_info.indices_));
+  depth_view_->setPoints(*plane_info.indices_);
   depth_view_->setSensor(data_->depthSensor());
   depth_view_->setObject(checkerboard_);
 

@@ -137,12 +137,12 @@ Size1 CheckerboardViewsExtraction::extract(std::vector<CheckerboardViews::Ptr> &
 Size1 CheckerboardViewsExtraction::extractAll(std::vector<CheckerboardViews::Ptr> & cb_views_vec,
                                               bool interactive) const
 {
-  size_t added = 0;
+  Size1 added = 0;
 
 #pragma omp parallel for
-  for (size_t i = 0; i < data_vec_.size(); ++i)
+  for (Size1 i = 0; i < data_vec_.size(); ++i)
   {
-    size_t n = extract(data_vec_[i], cb_views_vec, interactive, force_);
+    Size1 n = extract(data_vec_[i], cb_views_vec, interactive, force_);
 #pragma omp atomic
     added += n;
   }
