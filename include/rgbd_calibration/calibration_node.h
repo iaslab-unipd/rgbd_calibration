@@ -86,9 +86,8 @@ protected:
   Transform initial_transform_;
 
   int downsample_ratio_;
-  bool estimate_depth_distortion_;
 
-  Size2 matrix_size_;
+  Size2 undistortion_matrix_cell_size_;
   Size2 images_size_;
 
   Calibration::Ptr calibration_;

@@ -56,11 +56,16 @@ bool DepthUndistortionEstimation::extractPlane(const Checkerboard & color_cb,
 
   bool plane_extracted = false;
 
-  int k[3] = {0, 1, -1}; // TODO Add parameter
-  for (Size1 i = 0; i < 3 and not plane_extracted; ++i)
+  int r[] = {0, 1, 2}; // TODO Add parameter
+  int k[] = {0, 1, -1, 2, -2}; // TODO Add parameter
+  for (Size1 i = 0; i < 5 and not plane_extracted; ++i)
   {
-    plane_extractor.setPoint(PCLPoint3(center.x(), center.y(), center.z() + radius * k[i]));
-    plane_extracted = plane_extractor.extract(plane_info);
+    for (Size1 j = 0; j < 3 and not plane_extracted; ++j)
+    {
+      plane_extractor.setRadius((1 + r[j]) * radius);
+      plane_extractor.setPoint(PCLPoint3(center.x(), center.y(), center.z() + (1 + r[j]) * radius * k[i]));
+      plane_extracted = plane_extractor.extract(plane_info);
+    }
   }
 
   return plane_extracted;
@@ -90,7 +95,7 @@ void DepthUndistortionEstimation::estimateLocalModel()
         inverse_global.undistort(0, 0, und_color_cb_center);
       }
 
-      RGBD_INFO(i + th, "Transformed z: " << gt_cb.center().z() << " -> " << und_color_cb_center.z());
+      RGBD_INFO(data.id_, "Transformed z: " << gt_cb.center().z() << " -> " << und_color_cb_center.z());
 
       // Undistort cloud
       PCLCloud3::Ptr und_cloud = boost::make_shared<PCLCloud3>(cloud);
@@ -104,10 +109,58 @@ void DepthUndistortionEstimation::estimateLocalModel()
       PlaneInfo plane_info;
       if (extractPlane(gt_cb, und_cloud, und_color_cb_center, plane_info))
       {
-        RGBD_INFO(i + th, "Plane extracted!!");
+        RGBD_INFO(data.id_, "Plane extracted!!");
+        plane_info_map_[data_vec_[i + th]] = plane_info;
 
-        Plane fitted_plane = PlaneFit<Scalar>::robustFit(PCLConversion<Scalar>::toPointMatrix(cloud, *plane_info.indices_),
-                                                         plane_info.std_dev_);
+//        Plane fitted_plane = PlaneFit<Scalar>::robustFit(PCLConversion<Scalar>::toPointMatrix(*und_cloud, *plane_info.indices_),
+//                                                         plane_info.std_dev_);
+
+        std::vector<int> indices;// = *plane_info.indices_;
+        indices.reserve(plane_info.indices_->size());
+        int w = und_cloud->width;
+        int h = und_cloud->height;
+        for (size_t j = 0; j < plane_info.indices_->size(); ++j)
+        {
+          int r = (*plane_info.indices_)[j] / w;
+          int c = (*plane_info.indices_)[j] % w;
+          if ((r - h/2)*(r - h/2) + (c - w/2)*(c - w/2) < (h/3)*(h/3))
+            indices.push_back((*plane_info.indices_)[j]);
+        }
+        Plane fitted_plane = PlaneFit<Scalar>::fit(PCLConversion<Scalar>::toPointMatrix(*und_cloud, indices));
+
+
+
+
+//        if (th == 0)
+//        {
+//          pcl::visualization::PCLVisualizer viz("VIZ");
+
+//          pcl::PointCloud<pcl::PointXYZRGB>::Ptr colored_cloud = boost::make_shared<pcl::PointCloud<pcl::PointXYZRGB> >(cloud_->width, cloud_->height);
+//          colored_cloud->is_dense = und_cloud->is_dense;
+
+//          for (size_t i = 0; i < und_cloud->size(); ++i)
+//          {
+//            colored_cloud->points[i].x = und_cloud->points[i].x;
+//            colored_cloud->points[i].y = und_cloud->points[i].y;
+//            colored_cloud->points[i].z = und_cloud->points[i].z;
+//            colored_cloud->points[i].r = 0;
+//            colored_cloud->points[i].g = 125;
+//            colored_cloud->points[i].b = 255;
+//          }
+
+//          for (size_t i = 0; i < plane_info.indices_->size(); ++i)
+//          {
+//            colored_cloud->points[(*plane_info.indices_)[i]].r = 255;
+//            colored_cloud->points[(*plane_info.indices_)[i]].g = 255;
+//            colored_cloud->points[(*plane_info.indices_)[i]].b = 0;
+//          }
+
+//          viz.addPointCloud(colored_cloud, "cloud");
+//          viz.spin();
+
+//        }
+
+
 
 #pragma omp critical
         {
@@ -116,26 +169,123 @@ void DepthUndistortionEstimation::estimateLocalModel()
           for (Size1 c = 0; c < gt_cb.corners().elements(); ++c)
           {
             const Point3 & corner = gt_cb.corners()[c];
-            inverse_global_fit_->addPoint(0, 0, corner, plane_info.plane_);
+            inverse_global_fit_->addPoint(0, 0, corner, fitted_plane);
           }
           if (i + th > 20)
             inverse_global_fit_->update();
+
         }
 
-//        Line line(gt_cb.center(), Point3::UnitZ());
-//        RGBD_INFO(i + th, "Real z: " << line.intersectionPoint(plane_info.plane_).z());
+        Line line(gt_cb.center(), Point3::UnitZ());
+        RGBD_INFO(data.id_, "Real z: " << line.intersectionPoint(fitted_plane).z());
 
 //      Scalar angle = RAD2DEG(std::acos(plane_info.equation_.normal().dot(gt_cb.plane().normal())));
 //      RGBD_INFO(data.id(), "Angle: " << angle);
 
       }
       else
-        RGBD_WARN(i + th, "Plane not extracted!!");
+        RGBD_WARN(data.id_, "Plane not extracted!!");
 
     }
 
     local_fit_->update();
   }
+
+}
+
+void DepthUndistortionEstimation::estimateLocalModelReverse()
+{
+  //std::reverse(data_vec_.begin(), data_vec_.end());
+
+  local_fit_->reset();
+
+  for (Size1 i = 0; i < data_vec_.size(); i += max_threads_)
+  {
+#pragma omp parallel for schedule(static, 1)
+    for (Size1 th = 0; th < max_threads_; ++th)
+    {
+      if (i + th >= data_vec_.size())
+        continue;
+
+      const DepthData & data = *data_vec_[i + th];
+      const Checkerboard & gt_cb = *data.checkerboard_;
+      const PCLCloud3 & cloud = *data.cloud_;
+
+      // Estimate center
+      Point3 und_color_cb_center = gt_cb.center();
+#pragma omp critical
+      {
+        InverseGlobalMatrixEigen inverse_global(inverse_global_fit_->model());
+        inverse_global.undistort(0, 0, und_color_cb_center);
+      }
+
+      RGBD_INFO(data.id_, "Transformed z: " << gt_cb.center().z() << " -> " << und_color_cb_center.z());
+
+      // Undistort cloud
+      PCLCloud3::Ptr und_cloud = boost::make_shared<PCLCloud3>(cloud);
+#pragma omp critical
+      {
+        LocalMatrixPCL local(local_fit_->model());
+        local.undistort(*und_cloud);
+      }
+
+      // Extract plane from undistorted cloud
+      PlaneInfo plane_info;
+      if (extractPlane(gt_cb, und_cloud, und_color_cb_center, plane_info))
+      {
+        RGBD_INFO(data.id_, "Plane extracted!!");
+
+//        Plane fitted_plane = PlaneFit<Scalar>::robustFit(PCLConversion<Scalar>::toPointMatrix(*und_cloud, *plane_info.indices_),
+//                                                         plane_info.std_dev_);
+
+        boost::shared_ptr<std::vector<int> > indices = boost::make_shared<std::vector<int> >();// = *plane_info.indices_;
+        indices->reserve(plane_info.indices_->size());
+        int w = und_cloud->width;
+        int h = und_cloud->height;
+        for (size_t j = 0; j < plane_info.indices_->size(); ++j)
+        {
+          int r = (*plane_info.indices_)[j] / w;
+          int c = (*plane_info.indices_)[j] % w;
+          if ((r - h/2)*(r - h/2) + (c - w/2)*(c - w/2) < (h/3)*(h/3))
+            indices->push_back((*plane_info.indices_)[j]);
+        }
+        Plane fitted_plane = PlaneFit<Scalar>::fit(PCLConversion<Scalar>::toPointMatrix(*und_cloud, *indices));
+
+
+        boost::shared_ptr<std::vector<int> > old_indices;
+#pragma omp critical
+        {
+           old_indices = plane_info_map_[data_vec_[i + th]].indices_;
+        }
+        indices->clear();
+        std::set_union(old_indices->begin(), old_indices->end(), plane_info.indices_->begin(), plane_info.indices_->end(), std::back_inserter(*indices));
+
+#pragma omp critical
+        {
+          local_fit_->accumulateCloud(cloud, *indices);
+          local_fit_->addAccumulatedPoints(fitted_plane);
+          plane_info_map_[data_vec_[i + th]].indices_ = indices;
+        }
+
+        Line line(gt_cb.center(), Point3::UnitZ());
+        RGBD_INFO(data.id_, "Real z: " << line.intersectionPoint(fitted_plane).z());
+
+      }
+      else
+        RGBD_WARN(data.id_, "Plane not extracted!!");
+
+    }
+
+  }
+  local_fit_->update();
+  //std::reverse(data_vec_.begin(), data_vec_.end());
+
+}
+
+
+
+void DepthUndistortionEstimation::optimizeLocalModel()
+{
 
 }
 
@@ -152,6 +302,8 @@ void DepthUndistortionEstimation::estimateGlobalModel()
     InverseGlobalMatrixEigen inverse_global(inverse_global_fit_->model());
     inverse_global.undistort(0, 0, und_color_cb_center);
 
+//    RGBD_INFO(data.id_, " - Transformed z: " << gt_cb.center().z() << " -> " << und_color_cb_center.z());
+
     PCLCloud3::Ptr und_cloud = boost::make_shared<PCLCloud3>(cloud);
     LocalMatrixPCL local(local_fit_->model());
     local.undistort(*und_cloud);
@@ -166,12 +318,15 @@ void DepthUndistortionEstimation::estimateGlobalModel()
 
 #pragma omp critical
       {
-        global_fit_->accumulateCloud(*und_cloud, *plane_info.indices_);
+        Indices reduced = *plane_info.indices_;
+        std::random_shuffle(reduced.begin(), reduced.end());
+        reduced.resize(reduced.size() / 5);
+        global_fit_->accumulateCloud(*und_cloud, reduced);
         global_fit_->addAccumulatedPoints(gt_cb.plane());
       }
     }
     else
-      RGBD_WARN(i, "Plane not extracted!!");
+      RGBD_WARN(data.id_, "Plane not extracted!!");
 
   }
   global_fit_->update();

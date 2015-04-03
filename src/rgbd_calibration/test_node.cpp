@@ -234,8 +234,8 @@ void TestNode::spin()
   ROS_INFO_STREAM("Added " << added << " images + point clouds.");
   if (not only_show_)
   {
-    //test_->testPlanarityError();
-    test_->testCheckerboardError();
+    test_->testPlanarityError();
+    //test_->testCheckerboardError();
   }
 
   rate = ros::Rate(1.0);

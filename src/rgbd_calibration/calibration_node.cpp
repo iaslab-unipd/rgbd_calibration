@@ -20,24 +20,18 @@ CalibrationNode::CalibrationNode(ros::NodeHandle & node_handle)
     publisher_(new Publisher(node_handle)),
     has_initial_transform_(false)
 {
-  checkerboards_sub_ = node_handle_.subscribe("checkerboard_array",
-                                              1,
-                                              &CalibrationNode::checkerboardArrayCallback,
-                                              this);
+  checkerboards_sub_ = node_handle_.subscribe("checkerboard_array", 1, &CalibrationNode::checkerboardArrayCallback, this);
 
   if (not node_handle_.getParam("camera_calib_url", camera_calib_url_))
     ROS_FATAL("Missing \"camera_calib_url\" parameter!!");
 
   node_handle_.param("camera_name", camera_name_, std::string("camera"));
 
-  node_handle_.param("estimate_depth_distortion", estimate_depth_distortion_, true); // TODO default = false
-//  node_handle_.param("distortion/cols", distortion_cols_, 80); // TODO rename
-//  node_handle_.param("distortion/rows", distortion_rows_, 60); // TODO rename
-  int matrix_size_x, matrix_size_y;
-  node_handle_.param("undistortion_matrix/cols", matrix_size_x, 641);
-  node_handle_.param("undistortion_matrix/rows", matrix_size_y, 481);
-  matrix_size_.x() = matrix_size_x;
-  matrix_size_.y() = matrix_size_y;
+  int undistortion_matrix_cell_size_x, undistortion_matrix_cell_size_y;
+  node_handle_.param("undistortion_matrix/cell_size_x", undistortion_matrix_cell_size_x, 8);
+  node_handle_.param("undistortion_matrix/cell_size_y", undistortion_matrix_cell_size_y, 8);
+  undistortion_matrix_cell_size_.x() = undistortion_matrix_cell_size_x;
+  undistortion_matrix_cell_size_.y() = undistortion_matrix_cell_size_y;
 
   int images_size_x, images_size_y;
   node_handle_.param("depth_image/cols", images_size_x, 640);
@@ -55,6 +49,12 @@ CalibrationNode::CalibrationNode(ros::NodeHandle & node_handle)
   {
     images_size_ /= downsample_ratio_;
   }
+
+  std::vector<double> depth_error_function;
+  if (not node_handle_.getParam("depth_error_function", depth_error_function))
+    ROS_FATAL("Missing \"depth_error_function\" parameter!!");
+  else if (depth_error_function.size() != 3)
+    ROS_FATAL("\"depth_error_function\" must be a vector of size 3!!");
 
   if (node_handle_.hasParam("camera_pose"))
   {
@@ -92,7 +92,7 @@ bool CalibrationNode::initialize()
   depth_sensor_ = boost::make_shared<KinectDepthSensor<UndistortionModel> >();
   depth_sensor_->setFrameId("/depth_sensor");
   depth_sensor_->setParent(world);
-  Polynomial<Scalar, 2> depth_error_function(KINECT_ERROR_POLY); // TODO add parameter
+  Polynomial<Scalar, 2> depth_error_function(Vector3(0.0, 0.0, 0.005)); // TODO add parameter
   depth_sensor_->setDepthErrorFunction(depth_error_function);
 
   CameraInfoManager manager(node_handle_, camera_name_, camera_calib_url_);
@@ -114,29 +114,24 @@ bool CalibrationNode::initialize()
   if (not has_initial_transform_)
     calibration_->setEstimateInitialTransform(true);
 
-  if (estimate_depth_distortion_)
-  {
-    LocalModel::Data::Ptr local_matrix = boost::make_shared<LocalModel::Data>(matrix_size_, LocalPolynomial::IdentityCoefficients());
+  LocalModel::Ptr local_model = boost::make_shared<LocalModel>(images_size_);
+  LocalModel::Data::Ptr local_matrix = local_model->createMatrix(undistortion_matrix_cell_size_, LocalPolynomial::IdentityCoefficients());
+  local_model->setMatrix(local_matrix);
 
-    LocalModel::Ptr local_model = boost::make_shared<LocalModel>(images_size_);
-    local_model->setMatrix(local_matrix);
 
-    GlobalModel::Data::Ptr global_data = boost::make_shared<GlobalModel::Data>(Size2(2, 2), GlobalPolynomial::IdentityCoefficients());
+  GlobalModel::Ptr global_model = boost::make_shared<GlobalModel>(images_size_);
+  GlobalModel::Data::Ptr global_data = boost::make_shared<GlobalModel::Data>(Size2(2, 2), GlobalPolynomial::IdentityCoefficients());
+  global_model->setMatrix(global_data);
 
-    GlobalModel::Ptr global_model = boost::make_shared<GlobalModel>(images_size_);
-    global_model->setMatrix(global_data);
+  UndistortionModel::Ptr model = boost::make_shared<UndistortionModel>();
+  model->setLocalModel(local_model);
+  model->setGlobalModel(global_model);
 
-    UndistortionModel::Ptr model = boost::make_shared<UndistortionModel>();
-    model->setLocalModel(local_model);
-    model->setGlobalModel(global_model);
+  depth_sensor_->setUndistortionModel(model);
 
-    depth_sensor_->setUndistortionModel(model);
-
-    calibration_->setLocalModel(local_model);
-    calibration_->setGlobalModel(global_model);
-    calibration_->setEstimateDepthUndistortionModel(true);
-  }
-
+  calibration_->setLocalModel(local_model);
+  calibration_->setGlobalModel(global_model);
+  calibration_->initDepthUndistortionModel();
   calibration_->setPublisher(publisher_);
   calibration_->setDownSampleRatio(downsample_ratio_);
 

@@ -45,28 +45,31 @@ void CalibrationTest::publishData() const
 void CalibrationTest::addData(const cv::Mat & image,
                               const PCLCloud3::ConstPtr & cloud)
 {
-  PCLCloud3::Ptr new_cloud = boost::make_shared<PCLCloud3>();
-  std::vector<int> remapping;
-  pcl::removeNaNFromPointCloud(*cloud, *new_cloud, remapping);
+//  PCLCloud3::Ptr new_cloud = boost::make_shared<PCLCloud3>();
+//  std::vector<int> remapping;
+//  pcl::removeNaNFromPointCloud(*cloud, *new_cloud, remapping);
 
-  if (ratio_ > 1)
-  {
-    pcl::RandomSample<PCLPoint3> random_sample;
-    random_sample.setInputCloud(new_cloud);
-    random_sample.setSample(new_cloud->size() / ratio_);
-    random_sample.setSeed(rand());
-    random_sample.filter(*new_cloud);
-  }
+//  if (ratio_ > 1)
+//  {
+//    pcl::RandomSample<PCLPoint3> random_sample;
+//    random_sample.setInputCloud(new_cloud);
+//    random_sample.setSample(new_cloud->size() / ratio_);
+//    random_sample.setSeed(rand());
+//    random_sample.filter(*new_cloud);
+//  }
 
   int index = data_vec_.size() + 1;
+
+  cv::Mat rectified;
+  color_sensor_->cameraModel()->rectifyImage(image, rectified);
 
   RGBDData::Ptr data(boost::make_shared<RGBDData>(index));
   data->setColorSensor(color_sensor_);
   data->setDepthSensor(depth_sensor_);
-  data->setColorData(image);
-  data->setDepthData(*new_cloud);
+  data->setColorData(rectified);
+  data->setDepthData(*cloud);
 
-  PCLCloud3::Ptr part_und_cloud = boost::make_shared<PCLCloud3>(*new_cloud);
+  PCLCloud3::Ptr part_und_cloud = boost::make_shared<PCLCloud3>(*cloud);
   local_matrix_->undistort(*part_und_cloud);
 
   RGBDData::Ptr part_und_data(boost::make_shared<RGBDData>(index));
@@ -185,7 +188,7 @@ void CalibrationTest::testPlanarityError() const
     var /= points.elements();
     var -= mean * mean;
 
-    ROS_INFO_STREAM(d_mean << " " << mean << " " << std::sqrt(var) << " " << max << " ** " << und_mean << " " << std::sqrt(und_var) << " " << und_max);
+    std::cout << d_mean << " " << mean << " " << std::sqrt(var) << " " << max << " ** " << und_mean << " " << std::sqrt(und_var) << " " << und_max << std::endl;
   }
 
 }

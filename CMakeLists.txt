@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(rgbd_calibration)
-set(CMAKE_BUILD_TYPE Release)
+set(CMAKE_BUILD_TYPE RelWithDebInfo)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
@@ -30,11 +30,10 @@ set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}
 #######################################
 
 ## Generate messages in the 'msg' folder
-#add_message_files(
-#  FILES
-#  CheckerboardMsg.msg
-#  CheckerboardArray.msg
-#)
+add_message_files(
+  FILES
+  Acquisition.msg
+)
 
 ## Generate services in the 'srv' folder
 # add_service_files(
@@ -44,10 +43,10 @@ set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}
 # )
 
 ## Generate added messages and services with any dependencies listed here
-#generate_messages(
-#  DEPENDENCIES
-#  std_msgs
-#)
+generate_messages(
+  DEPENDENCIES
+  std_msgs
+)
 
 ###################################################
 ## Declare things to be passed to other projects ##
@@ -78,8 +77,7 @@ include_directories(include
 
 ## Declare a cpp library
 
-add_library(rgbd_calibration STATIC
-  src/rgbd_calibration/calibration_node.cpp              include/rgbd_calibration/calibration_node.h
+add_library(rgbd_calibration
   src/rgbd_calibration/calibration.cpp                   include/rgbd_calibration/calibration.h
                                                          include/rgbd_calibration/globals.h
   src/rgbd_calibration/depth_undistortion_estimation.cpp include/rgbd_calibration/depth_undistortion_estimation.h
@@ -89,12 +87,13 @@ add_library(rgbd_calibration STATIC
 )
 
 add_executable(rgbd_offline_calibration
+  src/rgbd_calibration/calibration_node.cpp              include/rgbd_calibration/calibration_node.h
   src/rgbd_calibration/offline_calibration_node.cpp      include/rgbd_calibration/offline_calibration_node.h
 )
 
-add_executable(simulation
-  src/rgbd_calibration/simulation_node.cpp               include/rgbd_calibration/simulation_node.h
-)
+#add_executable(simulation
+#  src/rgbd_calibration/simulation_node.cpp               include/rgbd_calibration/simulation_node.h
+#)
 
 add_executable(test_calibration
   src/rgbd_calibration/test_node.cpp                     include/rgbd_calibration/test_node.h
@@ -125,13 +124,13 @@ target_link_libraries(rgbd_offline_calibration
   ${CERES_LIBRARIES}
 )
 
-target_link_libraries(simulation
-  rgbd_calibration
-  ${catkin_LIBRARIES}
-  ${PCL_LIBRARIES}
-  ${OpenCV_LIBS}
-  ${CERES_LIBRARIES}
-)
+#target_link_libraries(simulation
+#  rgbd_calibration
+#  ${catkin_LIBRARIES}
+#  ${PCL_LIBRARIES}
+#  ${OpenCV_LIBS}
+#  ${CERES_LIBRARIES}
+#)
 
 target_link_libraries(test_calibration
   rgbd_calibration

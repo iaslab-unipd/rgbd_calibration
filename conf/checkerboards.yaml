@@ -12,6 +12,6 @@ checkerboards:
 #  cell_width: 0.058
 #  cell_height: 0.0583
 #- rows: 5
-#  cols: 7
-#  cell_width: 0.080
-#  cell_height: 0.080
+#  cols: 8
+#  cell_width: 0.030
+#  cell_height: 0.030

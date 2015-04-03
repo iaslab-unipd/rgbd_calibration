@@ -85,14 +85,8 @@ public:
     estimate_initial_trasform_ = estimate_initial_trasform;
   }
 
-  void setEstimateDepthUndistortionModel(bool estimate_depth_und_model)
+  void initDepthUndistortionModel()
   {
-    if (not estimate_depth_und_model)
-    {
-      estimate_depth_und_model_ = false;
-      return;
-    }
-
     assert(local_matrix_ and global_matrix_);
     estimate_depth_und_model_ = true;
 

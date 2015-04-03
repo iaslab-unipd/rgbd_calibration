@@ -1,3 +1,4 @@
+<?xml version="1.0"?>
 <launch>
 
 <arg name="ns" default="calibration" />
@@ -11,14 +12,14 @@
     <arg name="image_filename"        default="image_" />
     <arg name="cloud_filename"        default="cloud_" />
 
-    <arg name="camera_name"           default="rgb_PS1080_PrimeSense" /> <!-- default="rgb_A00367A01433047A" -->
+    <arg name="camera_name"           default="rgb_PS1080_PrimeSense" /> <!-- default="rgb_PS1080_PrimeSense" default="rgb_A00367A01433047A" -->
     <arg name="camera_type"           default="pinhole" />
     <arg name="camera_calib_url"      default="file://$(env HOME)/.ros/camera_info/$(arg camera_name).yaml" />
 
     <arg name="depth_type"            default="kinect" />
     <arg name="depth_calib_url"       default="file:///dev/null" />
     
-    <arg name="downsample_ratio"      default="1" />
+    <arg name="downsample_ratio"      default="2" />
 	
     <node pkg="rgbd_calibration" type="rgbd_offline_calibration" name="rgbd_offline" output="screen" required="true">
     
@@ -35,13 +36,17 @@
         
         <param name="depth_type"       value="$(arg depth_type)" />
         
-        <rosparam param="camera_pose">
-          translation: {x: 0.0, y: 0.0, z: 0.0}
-          rotation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
+        <rosparam>
+          camera_pose:
+            translation: {x: 0.0, y: 0.0, z: 0.0}
+            rotation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
+            
+          depth_error_function: [0.0, 0.0, 0.0035]
+          
+          undistortion_matrix:
+            cell_size_x: 4
+            cell_size_y: 4
         </rosparam>
-        
-        <param name="distortion/rows"  value="60" />
-        <param name="distortion/cols"  value="80" />
         
         <param name="downsample_ratio" value="$(arg downsample_ratio)" />
         

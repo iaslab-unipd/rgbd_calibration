@@ -48,10 +48,13 @@ public:
     typedef boost::shared_ptr<DepthData> Ptr;
     typedef boost::shared_ptr<const DepthData> ConstPtr;
 
-    DepthData()
-      : plane_extracted_(false)
+    DepthData(int id)
+      : id_(id),
+        plane_extracted_(false)
     {
     }
+
+    int id_;
 
     PCLCloud3::ConstPtr cloud_;
     Checkerboard::ConstPtr checkerboard_; // Attention: in depth coordinates!!
@@ -106,7 +109,7 @@ public:
   inline const DepthData::Ptr & addDepthData(const PCLCloud3::ConstPtr & cloud,
                                              const Checkerboard::ConstPtr & checkerboard)
   {
-    DepthData::Ptr data = boost::make_shared<DepthData>();
+    DepthData::Ptr data = boost::make_shared<DepthData>(data_vec_.size() + 1);
     data->cloud_ = cloud;
     data->checkerboard_ = checkerboard;
     addDepthData(data);
@@ -120,6 +123,10 @@ public:
 
   void estimateLocalModel();
 
+  void estimateLocalModelReverse();
+
+  void optimizeLocalModel();
+
   void estimateGlobalModel();
 
   inline void setMaxThreads(size_t max_threads)
@@ -128,29 +135,32 @@ public:
     max_threads_ = max_threads;
   }
 
-  Eigen::Matrix<Scalar, Eigen::Dynamic, 3> getLocalSamples(Size1 x_index,
-                                                           Size1 y_index) const
+  Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic> getLocalSamples(Size1 x_index,
+                                                                        Size1 y_index) const
   {
-    const std::vector<std::pair<Scalar, Scalar> > & samples = local_fit_->getSamples(x_index, y_index);
-    Eigen::Matrix<Scalar, Eigen::Dynamic, 3> eigen_samples(samples.size(), 3);
+    const LocalMatrixFitPCL::DataBin & samples = local_fit_->getSamples(x_index, y_index);
+    Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic> eigen_samples(samples.size(), 3);
 
     for (Size1 i = 0; i < samples.size(); ++i)
-      eigen_samples.row(i) << samples[i].first, samples[i].second, samples[i].first - samples[i].second;
+    {
+      const LocalMatrixFitPCL::Data & sample = samples[i];
+      eigen_samples.row(i) << sample.x_, sample.y_, sample.weight_;
+    }
 
     return eigen_samples;
   }
 
-  Eigen::Matrix<Scalar, Eigen::Dynamic, 3> getGlobalSamples(Size1 x_index,
-                                                            Size1 y_index) const
-  {
-    const std::vector<std::pair<Scalar, Scalar> > & samples = global_fit_->getSamples(x_index, y_index);
-    Eigen::Matrix<Scalar, Eigen::Dynamic, 3> eigen_samples(samples.size(), 3);
+//  Eigen::Matrix<Scalar, Eigen::Dynamic, 3> getGlobalSamples(Size1 x_index,
+//                                                            Size1 y_index) const
+//  {
+//    const std::vector<std::pair<Scalar, Scalar> > & samples = global_fit_->getSamples(x_index, y_index);
+//    Eigen::Matrix<Scalar, Eigen::Dynamic, 3> eigen_samples(samples.size(), 3);
 
-    for (Size1 i = 0; i < samples.size(); ++i)
-      eigen_samples.row(i) << samples[i].first, samples[i].second, samples[i].first - samples[i].second;
+//    for (Size1 i = 0; i < samples.size(); ++i)
+//      eigen_samples.row(i) << samples[i].first, samples[i].second, samples[i].first - samples[i].second;
 
-    return eigen_samples;
-  }
+//    return eigen_samples;
+//  }
 
 private:
 
@@ -171,6 +181,8 @@ private:
   InverseGlobalMatrixFitEigen::Ptr inverse_global_fit_;
 
   std::vector<DepthData::Ptr> data_vec_;
+
+  std::map<DepthData::ConstPtr, PlaneInfo> plane_info_map_;
 
 };
 
