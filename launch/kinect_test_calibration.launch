@@ -1,0 +1,60 @@
+<?xml version="1.0"?>
+<launch>
+
+<arg name="ns" default="calibration" />
+
+<group ns="$(arg ns)">
+
+    <arg name="path"                   default="$(env HOME)/.ros/calibration_data/test_cb/kinect1" /> <!-- "$(env HOME)/.ros/calibration_data/2013-11-07_17-00-24" -->
+    <arg name="instances"              default="0" />
+    <arg name="image_extension"        default="png" />
+    <arg name="starting_index"         default="1" />
+    <arg name="image_filename"         default="image_" />
+    <arg name="cloud_filename"         default="cloud_" />
+
+    <arg name="camera_name"            default="rgb_A00367A01433047A" /> <!-- "rgb_A00367A01433047A" /-->
+    <arg name="camera_calib_url"       default="file://$(env HOME)/.ros/camera_info/$(arg camera_name).yaml" />
+    
+    <arg name="downsample_ratio"       default="1" />
+    
+    <arg name="local_und_matrix_file"  default="/tmp/local_matrix.txt" />
+    <arg name="global_und_matrix_file" default="/tmp/opt_global_matrix.txt" />
+    
+    <arg name="only_show"              default="false" />
+	
+    <node pkg="rgbd_calibration" type="test_calibration" name="test_calibration" output="screen" required="true">
+    
+        <param name="path"             value="$(arg path)" />
+        <param name="instances"        value="$(arg instances)" />
+        <param name="image_extension"  value="$(arg image_extension)" />
+        <param name="starting_index"   value="$(arg starting_index)" />
+        <param name="image_filename"   value="$(arg image_filename)" />
+        <param name="cloud_filename"   value="$(arg cloud_filename)" />
+        
+        <param name="camera_name"      value="$(arg camera_name)" />
+        <param name="camera_calib_url" value="$(arg camera_calib_url)" />
+        
+        <rosparam param="camera_pose">
+          translation: {x: 0.0187969, y: -0.00239068, z: 0.00841721}
+          rotation: {x: -0.00787065, y: 0.00194876, z: 0.00280728, w: 0.999963}
+        </rosparam>
+        
+        <param name="downsample_ratio" value="$(arg downsample_ratio)" />
+        
+        <param name="local_und_matrix_file" value="$(arg local_und_matrix_file)" />
+        <param name="global_und_matrix_file" value="$(arg global_und_matrix_file)" />
+        
+        
+        <param name="only_show" value="$(arg only_show)" />
+        
+        
+    </node>
+
+    <node pkg="rostopic" type="rostopic" name="checkerboards_pub" output="screen" 
+          args="pub -f $(find rgbd_calibration)/conf/checkerboards.yaml test_calibration/checkerboard_array
+                calibration_msgs/CheckerboardArray --latch">
+    </node>
+
+</group>
+
+</launch>

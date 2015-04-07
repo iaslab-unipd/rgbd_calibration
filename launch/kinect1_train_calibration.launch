@@ -1,0 +1,62 @@
+<?xml version="1.0"?>
+<launch>
+
+<arg name="ns" default="calibration" />
+
+<group ns="$(arg ns)">
+
+    <arg name="path"                  default="$(env HOME)/.ros/calibration_data/train/kinect1" />
+    <arg name="instances"             default="0" />
+    <arg name="image_extension"       default="png" />
+    <arg name="starting_index"        default="1" />
+    <arg name="image_filename"        default="image_" />
+    <arg name="cloud_filename"        default="cloud_" />
+
+    <arg name="camera_name"           default="rgb_A00367A01433047A" />
+    <arg name="camera_type"           default="pinhole" />
+    <arg name="camera_calib_url"      default="file://$(env HOME)/.ros/camera_info/$(arg camera_name).yaml" />
+
+    <arg name="depth_type"            default="kinect" />
+    <arg name="depth_calib_url"       default="file:///dev/null" />
+    
+    <arg name="downsample_ratio"      default="2" />
+	
+    <node launch-prefix="gdb -ex run --args" pkg="rgbd_calibration" type="rgbd_offline_calibration" name="rgbd_offline" output="screen" required="true">
+    
+        <param name="path"             value="$(arg path)" />
+        <param name="instances"        value="$(arg instances)" />
+        <param name="image_extension"  value="$(arg image_extension)" />
+        <param name="starting_index"   value="$(arg starting_index)" />
+        <param name="image_filename"   value="$(arg image_filename)" />
+        <param name="cloud_filename"   value="$(arg cloud_filename)" />
+        
+        <param name="camera_name"      value="$(arg camera_name)" />
+        <param name="camera_type"      value="$(arg camera_type)" />
+        <param name="camera_calib_url" value="$(arg camera_calib_url)" />
+        
+        <param name="depth_type"       value="$(arg depth_type)" />
+        
+        <rosparam>
+          camera_pose:
+            translation: {x: 0.0, y: 0.0, z: 0.0}
+            rotation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
+            
+          depth_error_function: [0.0, 0.0, 0.0035]
+          
+          undistortion_matrix:
+            cell_size_x: 8
+            cell_size_y: 8
+        </rosparam>
+        
+        <param name="downsample_ratio" value="$(arg downsample_ratio)" />
+        
+    </node>
+
+    <node pkg="rostopic" type="rostopic" name="checkerboards_pub" output="screen" 
+          args="pub -f $(find rgbd_calibration)/conf/checkerboards.yaml rgbd_offline/checkerboard_array
+                calibration_msgs/CheckerboardArray --latch">
+    </node>
+
+</group>
+
+</launch>
