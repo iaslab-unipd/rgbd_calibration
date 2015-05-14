@@ -33,6 +33,9 @@
 
 #include <pcl/visualization/pcl_visualizer.h>
 #include <pcl/filters/random_sample.h>
+#include <pcl/io/pcd_io.h>
+
+#include <eigen_conversions/eigen_msg.h>
 
 #include <calibration_common/ceres/plane_fit.h>
 #include <calibration_common/base/pcl_conversion.h>
@@ -205,7 +208,7 @@ void Calibration::perform()
 
     depth_undistortion_estimation_->estimateLocalModel();
     depth_undistortion_estimation_->estimateLocalModelReverse();
-//    depth_undistortion_estimation_->estimateLocalModelReverse();
+    depth_undistortion_estimation_->optimizeLocalModel(depth_sensor_->depthErrorFunction());
     depth_undistortion_estimation_->estimateGlobalModel();
 
     for (Size1 i = 0; i < cb_views_vec_.size(); ++i)
@@ -511,7 +514,36 @@ public:
       depth_points.container() = depth_points_.container().cast<T>();
       global.undistort(depth_points);
 
-      typename Types<T>::Plane depth_plane(PlaneFit<T>::fit(typename Types<T>::Cloud3(depth_points, plane_indices_)));
+//      typename Types<T>::Plane depth_plane(PlaneFit<T>::fit(typename Types<T>::Cloud3(depth_points, plane_indices_)));
+
+//      typename Types<T>::Cloud3 cb_corners(checkerboard_->corners().size());
+//      cb_corners.container() = checkerboard_pose_eigen * checkerboard_->corners().container().cast<T>();
+//      typename Types<T>::Cloud2 reprojected_corners = camera_model_->project3dToPixel<T>(cb_corners);
+//      cb_corners.transform(color_sensor_pose_eigen);
+
+//      Polynomial<T, 2> depth_error_function(depth_error_function_.coefficients().cast<T>());
+
+//      typename Types<T>::Vector3 normal = Types<T>::Plane::Through(cb_corners(0, 0), cb_corners(0, 1), cb_corners(1, 0)).normal();
+//      if (depth_plane.normal().dot(normal) < 0)
+//        normal *= -1.0;
+
+//      for (Size1 i = 0; i < cb_corners.elements(); ++i)
+//      {
+//        residuals[5 * i] = T((reprojected_corners[i].x() - image_corners_[i].cast<T>().x()) / 0.5);// * penalty;
+//        residuals[5 * i + 1] = T((reprojected_corners[i].y() - image_corners_[i].cast<T>().y()) / 0.5);// * penalty;
+
+//        Line line(Point3::Zero(), cb_corners[i].normalized());
+//        residuals[5 * i + 2] = T((line.intersectionPoint(depth_plane).x() - cb_corners[i].x())
+//                                 / ceres::poly_eval(depth_error_function.coefficients(), cb_corners[i].z()));// * penalty;
+//        residuals[5 * i + 3] = T((line.intersectionPoint(depth_plane).y() - cb_corners[i].y())
+//                                 / ceres::poly_eval(depth_error_function.coefficients(), cb_corners[i].z()));// * penalty;
+//        residuals[5 * i + 4] = T((line.intersectionPoint(depth_plane).z() - cb_corners[i].z())
+//                                 / ceres::poly_eval(depth_error_function.coefficients(), cb_corners[i].z()));// * penalty;
+
+//      }
+//      residuals[5 * cb_corners.elements()    ] = (normal - depth_plane.normal()).x() * cb_corners.elements();
+//      residuals[5 * cb_corners.elements() + 1] = (normal - depth_plane.normal()).y() * cb_corners.elements();
+//      residuals[5 * cb_corners.elements() + 2] = (normal - depth_plane.normal()).z() * cb_corners.elements();
 
       typename Types<T>::Cloud3 cb_corners(checkerboard_->corners().size());
       cb_corners.container() = checkerboard_pose_eigen * checkerboard_->corners().container().cast<T>();
@@ -520,22 +552,24 @@ public:
 
       Polynomial<T, 2> depth_error_function(depth_error_function_.coefficients().cast<T>());
 
-      T angle = ceres::acos(ceres::abs(depth_plane.normal().dot(Types<T>::Plane::Through(cb_corners(0, 0), cb_corners(0, 1), cb_corners(1, 0)).normal())));
-      T penalty = ceres::exp(angle);
+      Eigen::Map<Eigen::Matrix<T, 2, Eigen::Dynamic> > residual_map_corners_2d(residuals, 2, cb_corners.elements());
+      residual_map_corners_2d = (reprojected_corners.container() - image_corners_.container().cast<T>()) / (0.25 * cb_corners.elements());
 
-      for (Size1 i = 0; i < cb_corners.elements(); ++i)
+//      Eigen::Map<Eigen::Matrix<T, 3, Eigen::Dynamic> > residual_map_corners_3d(&residuals[2 * cb_corners.elements()], 3, cb_corners.elements());
+//      typename Types<T>::Plane depth_plane(PlaneFit<T>::fit(typename Types<T>::Cloud3(depth_points, plane_indices_)));
+//      for (Size1 i = 0; i < cb_corners.elements(); ++i)
+//      {
+//        Line line(Point3::Zero(), cb_corners[i].normalized());
+//        residual_map_corners_3d.col(i) = (line.intersectionPoint(depth_plane) - cb_corners[i]) / (0.01 * cb_corners.elements());
+//      }
+
+      Eigen::Map<Eigen::Matrix<T, 3, Eigen::Dynamic> > residual_map_dist(&residuals[2 * cb_corners.elements()], 3, plane_indices_.size());
+      typename Types<T>::Plane cb_plane = Types<T>::Plane::Through(cb_corners(0, 0), cb_corners(0, 1), cb_corners(1, 0));
+      for (Size1 i = 0; i < plane_indices_.size(); ++i)
       {
-        residuals[5 * i] = T((reprojected_corners[i].x() - image_corners_[i].cast<T>().x()) / 0.25);
-        residuals[5 * i + 1] = T((reprojected_corners[i].y() - image_corners_[i].cast<T>().y()) / 0.25);
-
-        Line line(Point3::Zero(), cb_corners[i]);
-        residuals[5 * i + 2] = T((line.intersectionPoint(depth_plane).x() - cb_corners[i].x())
-                                 / ceres::poly_eval(depth_error_function.coefficients(), cb_corners[i].z()));// * penalty;
-        residuals[5 * i + 3] = T((line.intersectionPoint(depth_plane).y() - cb_corners[i].y())
-                                 / ceres::poly_eval(depth_error_function.coefficients(), cb_corners[i].z()));// * penalty;
-        residuals[5 * i + 4] = T((line.intersectionPoint(depth_plane).z() - cb_corners[i].z())
-                                 / ceres::poly_eval(depth_error_function.coefficients(), cb_corners[i].z()));// * penalty;
-
+        Line line(Point3::Zero(), depth_points[plane_indices_[i]].normalized());
+        residual_map_dist.col(i) = (line.intersectionPoint(cb_plane) - depth_points[plane_indices_[i]]) /
+            (plane_indices_.size() * ceres::poly_eval(depth_error_function.coefficients(), depth_points[plane_indices_[i]].z()));
       }
 
       return true;
@@ -556,6 +590,8 @@ private:
 };
 
 
+typedef ceres::NumericDiffCostFunction<TransformDistortionError, ceres::CENTRAL, ceres::DYNAMIC, 6,
+    3 * MathTraits<GlobalPolynomial>::Size, 6> TransformDistortionCostFunction;
 
 void Calibration::optimizeAll(const std::vector<CheckerboardViews::Ptr> & cb_views_vec)
 {
@@ -578,6 +614,7 @@ void Calibration::optimizeAll(const std::vector<CheckerboardViews::Ptr> & cb_vie
     data.row(i).tail<3>() = cb_views.colorCheckerboard()->pose().translation();
 
     TransformDistortionError * error;
+    ceres::CostFunction * cost_function;
 
     if (cb_views.depthView()->data()->size() > 160 * 120 and
         cb_views.depthView()->data()->width % 160 == 0 and
@@ -619,6 +656,11 @@ void Calibration::optimizeAll(const std::vector<CheckerboardViews::Ptr> & cb_vie
                                            depth_sensor_->depthErrorFunction(),
                                            Size2(160, 120));
 
+
+      cost_function = new TransformDistortionCostFunction(error,
+                                                          ceres::DO_NOT_TAKE_OWNERSHIP,
+                                                          3 * downsampled_indices.size() + 2 * cb_views.checkerboard()->size());
+
     }
     else
     {
@@ -629,14 +671,12 @@ void Calibration::optimizeAll(const std::vector<CheckerboardViews::Ptr> & cb_vie
                                            cb_views.depthView()->points(),
                                            depth_sensor_->depthErrorFunction(),
                                            global_model_->imageSize());
+
+     cost_function = new TransformDistortionCostFunction(error,
+                                                         ceres::DO_NOT_TAKE_OWNERSHIP,
+                                                         3 * cb_views.depthView()->points().size() + 2 * cb_views.checkerboard()->size());
     }
 
-    typedef ceres::NumericDiffCostFunction<TransformDistortionError, ceres::CENTRAL, ceres::DYNAMIC, 6,
-        3 * MathTraits<GlobalPolynomial>::Size, 6> TransformDistortionCostFunction;
-
-    ceres::CostFunction * cost_function = new TransformDistortionCostFunction(error,
-                                                                              ceres::DO_NOT_TAKE_OWNERSHIP,
-                                                                              5 * cb_views.checkerboard()->size());
     problem.AddResidualBlock(cost_function,
                              new ceres::CauchyLoss(1.0),
                              transform.data(),
@@ -645,7 +685,7 @@ void Calibration::optimizeAll(const std::vector<CheckerboardViews::Ptr> & cb_vie
   }
 
   ceres::Solver::Options options;
-  options.linear_solver_type = ceres::DENSE_QR;
+  options.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;
   options.max_num_iterations = 100;
   options.minimizer_progress_to_stdout = true;
   options.num_threads = 8;
@@ -683,6 +723,15 @@ void Calibration::optimize()
       RGBDData::Ptr und_data = boost::make_shared<RGBDData>(*cb_views.data());
       und_data->setDepthData(*depth_data.undistorted_cloud_);
 
+      std::stringstream ss;
+      ss <<  "/tmp/und_cloud_" << i <<  ".pcd";
+      pcl::PCDWriter writer;
+      writer.write(ss.str(), *depth_data.undistorted_cloud_);
+
+      ss.str("");
+      ss <<  "/tmp/cloud_" << i <<  ".pcd";
+      writer.write(ss.str(), *depth_data.cloud_);
+
       und_cb_views->setId(cb_views.id() + "_undistorted");
       und_cb_views->setData(und_data);
       und_cb_views->setPlaneInliers(depth_data.estimated_plane_.indices_, depth_data.estimated_plane_.std_dev_);
@@ -698,6 +747,16 @@ void Calibration::optimize()
 
   PolynomialUndistortionMatrixIO<GlobalPolynomial> io;
   io.write(*global_matrix_->model(), "/tmp/opt_global_matrix.txt");
+
+  int index = 0;
+  for (Scalar i = 1.0; i < 5.5; i += 0.5, ++index)
+  {
+    Scalar max;
+    std::stringstream ss;
+    ss << "/tmp/g_matrix_"<< index << ".png";
+    io.writeImageAuto(*global_matrix_->model(), i, ss.str(), max);
+    ROS_INFO_STREAM("Max " << i << ": " << max);
+  }
 
   const Size1 size = test_vec_.size();
 
@@ -715,6 +774,13 @@ void Calibration::optimize()
     test_vec_.push_back(new_test_data);
 
   }
+
+  std::ofstream transform_file;
+  transform_file.open("/tmp/camera_pose.yaml");
+  geometry_msgs::Pose pose_msg;
+  tf::poseEigenToMsg(color_sensor_->pose(), pose_msg);
+  transform_file << pose_msg;
+  transform_file.close();
 
 }
 

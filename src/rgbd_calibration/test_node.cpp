@@ -11,6 +11,8 @@
 
 #include <rgbd_calibration/test_node.h>
 
+#include <swissranger_camera/utility.h>
+
 using namespace camera_info_manager;
 using namespace calibration_msgs;
 
@@ -39,14 +41,16 @@ TestNode::TestNode(ros::NodeHandle & node_handle)
     Translation3 translation;
     Quaternion rotation;
 
-    node_handle_.getParam("camera_pose/translation/x", translation.vector().coeffRef(0));
-    node_handle_.getParam("camera_pose/translation/y", translation.vector().coeffRef(1));
-    node_handle_.getParam("camera_pose/translation/z", translation.vector().coeffRef(2));
+    node_handle_.getParam("camera_pose/position/x", translation.vector().coeffRef(0));
+    node_handle_.getParam("camera_pose/position/y", translation.vector().coeffRef(1));
+    node_handle_.getParam("camera_pose/position/z", translation.vector().coeffRef(2));
 
-    node_handle_.getParam("camera_pose/rotation/x", rotation.coeffs().coeffRef(0));
-    node_handle_.getParam("camera_pose/rotation/y", rotation.coeffs().coeffRef(1));
-    node_handle_.getParam("camera_pose/rotation/z", rotation.coeffs().coeffRef(2));
-    node_handle_.getParam("camera_pose/rotation/w", rotation.coeffs().coeffRef(3));
+    node_handle_.getParam("camera_pose/orientation/x", rotation.coeffs().coeffRef(0));
+    node_handle_.getParam("camera_pose/orientation/y", rotation.coeffs().coeffRef(1));
+    node_handle_.getParam("camera_pose/orientation/z", rotation.coeffs().coeffRef(2));
+    node_handle_.getParam("camera_pose/orientation/w", rotation.coeffs().coeffRef(3));
+
+    rotation.normalize();
 
     camera_pose_ = translation * rotation;
   }
@@ -85,6 +89,15 @@ TestNode::TestNode(ros::NodeHandle & node_handle)
   images_size_.x() = images_size_x;
   images_size_.y() = images_size_y;
 
+  std::string depth_type_s;
+  node_handle_.param("depth_type", depth_type_s, std::string("none"));
+  if (depth_type_s == "kinect1_depth")
+    depth_type_ = KINECT1_DEPTH;
+  else if (depth_type_s == "swiss_ranger_depth")
+    depth_type_ = SWISS_RANGER_DEPTH;
+  else
+    ROS_FATAL("Missing \"depth_type\" parameter!! Use \"kinect1_depth\" or \"swiss_ranger_depth\"");
+
 }
 
 bool TestNode::initialize()
@@ -101,8 +114,8 @@ bool TestNode::initialize()
   depth_sensor_ = boost::make_shared<KinectDepthSensor<UndistortionModel> >();
   depth_sensor_->setFrameId("/depth_sensor");
   depth_sensor_->setParent(world);
-  Polynomial<Scalar, 2> depth_error_function(KINECT_ERROR_POLY); // TODO add parameter
-  depth_sensor_->setDepthErrorFunction(depth_error_function);
+//  Polynomial<Scalar, 2> depth_error_function(KINECT_ERROR_POLY); // TODO add parameter
+//  depth_sensor_->setDepthErrorFunction(depth_error_function);
 
   CameraInfoManager manager(node_handle_, camera_name_, camera_calib_url_);
   PinholeCameraModel::ConstPtr pinhole_model = boost::make_shared<PinholeCameraModel>(manager.getCameraInfo());
@@ -219,11 +232,41 @@ void TestNode::spin()
     if (not image.data)
       continue;
 
-    PCLCloud3::Ptr cloud(new PCLCloud3);
-    pcl::PCDReader pcd_reader;
+    PCLCloud3::Ptr cloud;
 
-    if (pcd_reader.read(cloud_file.str(), *cloud) < 0)
-      continue;
+    pcl::PCDReader pcd_reader;
+    if (depth_type_ == KINECT1_DEPTH)
+    {
+       cloud = boost::make_shared<PCLCloud3>();
+
+      if (pcd_reader.read(cloud_file.str(), *cloud) < 0)
+      {
+        ROS_WARN_STREAM(cloud_file.str() << " not valid!");
+        continue;
+      }
+    }
+    else if (depth_type_ == SWISS_RANGER_DEPTH)
+    {
+      pcl::PCLPointCloud2Ptr pcl_cloud = boost::make_shared<pcl::PCLPointCloud2>();
+      sensor_msgs::PointCloud2Ptr ros_cloud = boost::make_shared<sensor_msgs::PointCloud2>();
+      sr::Utility sr_utility;
+      if (pcd_reader.read(cloud_file.str(), *pcl_cloud) < 0)
+      {
+        ROS_WARN_STREAM(cloud_file.str() << " not valid!");
+        continue;
+      }
+      pcl_conversions::fromPCL(*pcl_cloud, *ros_cloud);
+
+      sr_utility.setConfidenceThreshold(0.95f);
+      sr_utility.setInputCloud(ros_cloud);
+      sr_utility.setIntensityType(sr::Utility::INTENSITY_8BIT);
+      sr_utility.setConfidenceType(sr::Utility::CONFIDENCE_8BIT);
+      sr_utility.setNormalizeIntensity(true);
+      sr_utility.split(sr::Utility::CLOUD);
+
+      cloud = sr_utility.cloud();
+
+    }
 
     test_->addData(image, cloud);
     ++added;
@@ -231,11 +274,13 @@ void TestNode::spin()
     //rate.sleep();
   }
 
+  test_->visualizeClouds();
+
   ROS_INFO_STREAM("Added " << added << " images + point clouds.");
   if (not only_show_)
   {
     test_->testPlanarityError();
-    //test_->testCheckerboardError();
+    test_->testCheckerboardError();
   }
 
   rate = ros::Rate(1.0);

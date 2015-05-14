@@ -50,10 +50,9 @@ CalibrationNode::CalibrationNode(ros::NodeHandle & node_handle)
     images_size_ /= downsample_ratio_;
   }
 
-  std::vector<double> depth_error_function;
-  if (not node_handle_.getParam("depth_error_function", depth_error_function))
+  if (not node_handle_.getParam("depth_error_function", depth_error_coeffs_))
     ROS_FATAL("Missing \"depth_error_function\" parameter!!");
-  else if (depth_error_function.size() != 3)
+  else if (depth_error_coeffs_.size() != 3)
     ROS_FATAL("\"depth_error_function\" must be a vector of size 3!!");
 
   if (node_handle_.hasParam("camera_pose"))
@@ -92,7 +91,7 @@ bool CalibrationNode::initialize()
   depth_sensor_ = boost::make_shared<KinectDepthSensor<UndistortionModel> >();
   depth_sensor_->setFrameId("/depth_sensor");
   depth_sensor_->setParent(world);
-  Polynomial<Scalar, 2> depth_error_function(Vector3(0.0, 0.0, 0.005)); // TODO add parameter
+  Polynomial<Scalar, 2> depth_error_function(Vector3(depth_error_coeffs_[0], depth_error_coeffs_[1], depth_error_coeffs_[2]));
   depth_sensor_->setDepthErrorFunction(depth_error_function);
 
   CameraInfoManager manager(node_handle_, camera_name_, camera_calib_url_);

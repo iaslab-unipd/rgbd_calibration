@@ -6,7 +6,7 @@ set(CMAKE_BUILD_TYPE RelWithDebInfo)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS cmake_modules roscpp calibration_common geometry_msgs kinect
-                                        eigen_conversions camera_info_manager cv_bridge pcl_ros image_transport)
+                                        eigen_conversions camera_info_manager cv_bridge pcl_ros image_transport swissranger_camera)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)

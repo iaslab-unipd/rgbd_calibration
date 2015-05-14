@@ -16,12 +16,13 @@
     <arg name="camera_type"           default="pinhole" />
     <arg name="camera_calib_url"      default="file://$(env HOME)/.ros/camera_info/$(arg camera_name).yaml" />
 
-    <arg name="depth_type"            default="kinect" />
+    <arg name="depth_type"            default="kinect1_depth" />
     <arg name="depth_calib_url"       default="file:///dev/null" />
     
     <arg name="downsample_ratio"      default="2" />
 	
-    <node launch-prefix="gdb -ex run --args" pkg="rgbd_calibration" type="rgbd_offline_calibration" name="rgbd_offline" output="screen" required="true">
+	  <!-- launch-prefix="gdb -ex run - -args" -->
+    <node pkg="rgbd_calibration" type="rgbd_offline_calibration" name="rgbd_offline" output="screen" required="true">
     
         <param name="path"             value="$(arg path)" />
         <param name="instances"        value="$(arg instances)" />
@@ -44,8 +45,8 @@
           depth_error_function: [0.0, 0.0, 0.0035]
           
           undistortion_matrix:
-            cell_size_x: 8
-            cell_size_y: 8
+            cell_size_x: 2
+            cell_size_y: 2
         </rosparam>
         
         <param name="downsample_ratio" value="$(arg downsample_ratio)" />

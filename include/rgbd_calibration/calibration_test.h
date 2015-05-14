@@ -76,6 +76,8 @@ public:
 
   void publishData() const;
 
+  void visualizeClouds() const;
+
   void testPlanarityError() const;
 
   void testCheckerboardError() const;

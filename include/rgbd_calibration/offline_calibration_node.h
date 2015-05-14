@@ -23,6 +23,12 @@
 namespace calibration
 {
 
+enum DepthType
+{
+  KINECT1_DEPTH,
+  SWISS_RANGER_DEPTH
+};
+
 class OfflineCalibrationNode : public CalibrationNode
 {
 public:
@@ -45,6 +51,8 @@ protected:
   std::string image_extension_;
   std::string image_filename_;
   std::string cloud_filename_;
+
+  DepthType depth_type_;
 
 };
 

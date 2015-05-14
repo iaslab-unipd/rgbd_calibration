@@ -96,6 +96,8 @@ protected:
   PinholeSensor::Ptr color_sensor_;
   KinectDepthSensor<UndistortionModel>::Ptr depth_sensor_;
 
+  std::vector<double> depth_error_coeffs_;
+
 };
 
 } /* namespace calibration */

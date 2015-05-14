@@ -18,6 +18,9 @@
 
 #include <rgbd_calibration/offline_calibration_node.h>
 
+#include <swissranger_camera/utility.h>
+#include <pcl/conversions.h>
+
 using namespace camera_info_manager;
 using namespace calibration_msgs;
 
@@ -42,6 +45,14 @@ OfflineCalibrationNode::OfflineCalibrationNode(ros::NodeHandle & node_handle)
   node_handle_.param("image_filename", image_filename_, std::string("image_"));
   node_handle_.param("cloud_filename", cloud_filename_, std::string("cloud_"));
 
+  std::string depth_type_s;
+  node_handle_.param("depth_type", depth_type_s, std::string("none"));
+  if (depth_type_s == "kinect1_depth")
+    depth_type_ = KINECT1_DEPTH;
+  else if (depth_type_s == "swiss_ranger_depth")
+    depth_type_ = SWISS_RANGER_DEPTH;
+  else
+    ROS_FATAL("Missing \"depth_type\" parameter!! Use \"kinect1_depth\" or \"swiss_ranger_depth\"");
 }
 
 void OfflineCalibrationNode::spin()
@@ -90,13 +101,40 @@ void OfflineCalibrationNode::spin()
         continue;
       }
 
-      PCLCloud3::Ptr cloud(new PCLCloud3);
-      pcl::PCDReader pcd_reader;
+      PCLCloud3::Ptr cloud;
 
-      if (pcd_reader.read(cloud_it->second, *cloud) < 0)
+      pcl::PCDReader pcd_reader;
+      if (depth_type_ == KINECT1_DEPTH)
       {
-        ROS_WARN_STREAM(cloud_it->second << " not valid!");
-        continue;
+         cloud = boost::make_shared<PCLCloud3>();
+
+        if (pcd_reader.read(cloud_it->second, *cloud) < 0)
+        {
+          ROS_WARN_STREAM(cloud_it->second << " not valid!");
+          continue;
+        }
+      }
+      else if (depth_type_ == SWISS_RANGER_DEPTH)
+      {
+        pcl::PCLPointCloud2Ptr pcl_cloud = boost::make_shared<pcl::PCLPointCloud2>();
+        sensor_msgs::PointCloud2Ptr ros_cloud = boost::make_shared<sensor_msgs::PointCloud2>();
+        sr::Utility sr_utility;
+        if (pcd_reader.read(cloud_it->second, *pcl_cloud) < 0)
+        {
+          ROS_WARN_STREAM(cloud_it->second << " not valid!");
+          continue;
+        }
+        pcl_conversions::fromPCL(*pcl_cloud, *ros_cloud);
+
+        sr_utility.setConfidenceThreshold(0.90f);
+        sr_utility.setInputCloud(ros_cloud);
+        sr_utility.setIntensityType(sr::Utility::INTENSITY_8BIT);
+        sr_utility.setConfidenceType(sr::Utility::CONFIDENCE_8BIT);
+        sr_utility.setNormalizeIntensity(true);
+        sr_utility.split(sr::Utility::CLOUD);
+
+        cloud = sr_utility.cloud();
+
       }
 
       calibration_->addData(image, cloud);

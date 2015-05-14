@@ -29,7 +29,7 @@
 #include <pcl/point_types.h>
 #include <pcl/point_cloud.h>
 
-#define G_POLY_DEGREE 2
+#define G_POLY_DEGREE 3
 #define G_POLY_MIN_DEGREE 0
 #define L_POLY_DEGREE 2
 #define L_POLY_MIN_DEGREE 0
@@ -37,7 +37,7 @@
 //#define KINECT_FOV_X 58.6 //Scalar(DEG2RAD(57.0)) 58.6
 //#define KINECT_FOV_Y 45.7 //Scalar(DEG2RAD(43.5)) 45.7
 
-#define KINECT_ERROR_POLY Vector3(0.0, 0.0, 0.0035)
+//#define KINECT_ERROR_POLY Vector3(0.0, 0.0, 0.0035)
 
 namespace calibration
 {

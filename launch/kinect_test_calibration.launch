@@ -15,6 +15,8 @@
     <arg name="camera_name"            default="rgb_A00367A01433047A" /> <!-- "rgb_A00367A01433047A" /-->
     <arg name="camera_calib_url"       default="file://$(env HOME)/.ros/camera_info/$(arg camera_name).yaml" />
     
+    <arg name="depth_type"             default="kinect1_depth" />
+    
     <arg name="downsample_ratio"       default="1" />
     
     <arg name="local_und_matrix_file"  default="/tmp/local_matrix.txt" />
@@ -34,10 +36,9 @@
         <param name="camera_name"      value="$(arg camera_name)" />
         <param name="camera_calib_url" value="$(arg camera_calib_url)" />
         
-        <rosparam param="camera_pose">
-          translation: {x: 0.0187969, y: -0.00239068, z: 0.00841721}
-          rotation: {x: -0.00787065, y: 0.00194876, z: 0.00280728, w: 0.999963}
-        </rosparam>
+        <param name="depth_type"       value="$(arg depth_type)" />
+        
+        <rosparam param="camera_pose" command="load" file="/tmp/camera_pose.yaml" />
         
         <param name="downsample_ratio" value="$(arg downsample_ratio)" />
         

@@ -30,6 +30,8 @@
 #include <omp.h>
 #include <algorithm>
 
+#include <pcl/filters/extract_indices.h>
+
 #include <calibration_common/ceres/polynomial_fit.h>
 #include <calibration_common/ceres/plane_fit.h>
 #include <calibration_common/base/pcl_conversion.h>
@@ -126,7 +128,7 @@ void DepthUndistortionEstimation::estimateLocalModel()
           if ((r - h/2)*(r - h/2) + (c - w/2)*(c - w/2) < (h/3)*(h/3))
             indices.push_back((*plane_info.indices_)[j]);
         }
-        Plane fitted_plane = PlaneFit<Scalar>::fit(PCLConversion<Scalar>::toPointMatrix(*und_cloud, indices));
+        Plane fitted_plane = PlaneFit<Scalar>::robustFit(PCLConversion<Scalar>::toPointMatrix(*und_cloud, indices), plane_info.std_dev_);
 
 
 
@@ -249,7 +251,7 @@ void DepthUndistortionEstimation::estimateLocalModelReverse()
           if ((r - h/2)*(r - h/2) + (c - w/2)*(c - w/2) < (h/3)*(h/3))
             indices->push_back((*plane_info.indices_)[j]);
         }
-        Plane fitted_plane = PlaneFit<Scalar>::fit(PCLConversion<Scalar>::toPointMatrix(*und_cloud, *indices));
+        Plane fitted_plane = PlaneFit<Scalar>::robustFit(PCLConversion<Scalar>::toPointMatrix(*und_cloud, *indices), plane_info.std_dev_);
 
 
         boost::shared_ptr<std::vector<int> > old_indices;
@@ -282,10 +284,153 @@ void DepthUndistortionEstimation::estimateLocalModelReverse()
 
 }
 
-
-
-void DepthUndistortionEstimation::optimizeLocalModel()
+class LocalModelError
 {
+public:
+
+  LocalModelError(const PCLCloud3::ConstPtr & cloud,
+                  const Plane & plane,
+                  const LocalModel::Ptr & local_model,
+                  const Polynomial<double, 2> & depth_error_function)
+    : cloud_(cloud), plane_(plane), depth_error_function_(depth_error_function)
+  {
+    local_matrix_.setModel(local_model);
+  }
+
+  void addIndex(int x_index, int y_index)
+  {
+    indices_.push_back(std::make_pair(x_index, y_index));
+  }
+
+  void createCloudWithIndices()
+  {
+    part_cloud_.height = 1;
+    part_cloud_.width = indices_.size();
+    part_cloud_.points.resize(indices_.size());
+    for (Size1 i = 0; i < indices_.size(); ++i)
+    {
+      int index = indices_[i].first + cloud_->width * indices_[i].second;
+      part_cloud_.points[i] = cloud_->points[index];
+    }
+  }
+
+  int size() const
+  {
+    return indices_.size();
+  }
+
+  bool operator ()(const double * const local_poly_1_data,
+                   const double * const local_poly_2_data,
+                   const double * const local_poly_3_data,
+                   const double * const local_poly_4_data,
+                   double * residuals) const
+  {
+    PCLCloud3 tmp_cloud = part_cloud_;
+
+    Eigen::Map<Eigen::Matrix3Xd> residuals_map(residuals, 3, size());
+    Eigen::MatrixX4d polynomials(MathTraits<LocalPolynomial>::Size, 4);
+    polynomials.col(0) = Eigen::Map<const Eigen::Matrix<double, MathTraits<LocalPolynomial>::Size, 1> >(local_poly_1_data);
+    polynomials.col(1) = Eigen::Map<const Eigen::Matrix<double, MathTraits<LocalPolynomial>::Size, 1> >(local_poly_2_data);
+    polynomials.col(2) = Eigen::Map<const Eigen::Matrix<double, MathTraits<LocalPolynomial>::Size, 1> >(local_poly_3_data);
+    polynomials.col(3) = Eigen::Map<const Eigen::Matrix<double, MathTraits<LocalPolynomial>::Size, 1> >(local_poly_4_data);
+
+    for (Size1 i = 0; i < indices_.size(); ++i)
+    {
+      const std::pair<int, int> & index = indices_[i];
+
+      std::vector<LocalModel::LookupTableData> lt_data = local_matrix_.model()->lookupTable(index.first, index.second);
+
+      double tmp_depth = 0.0;
+      double depth = tmp_cloud.points[i].z;
+      for (Size1 j = 0; j < lt_data.size(); ++j)
+        tmp_depth += lt_data[j].weight_ * LocalPolynomial::evaluate(polynomials.col(j), depth);
+      depth = tmp_depth;
+      double k = depth / tmp_cloud.points[i].z;
+
+      Point3 p(tmp_cloud.points[i].x * k, tmp_cloud.points[i].y * k, depth);
+      Line line(Vector3::Zero(), p.normalized());
+      residuals_map.col(i) = (p - line.intersectionPoint(plane_)) / ceres::poly_eval(depth_error_function_.coefficients(), p.z());
+    }
+
+    return true;
+  }
+
+private:
+
+  const PCLCloud3::ConstPtr cloud_;
+  const Plane plane_;
+  LocalMatrixPCL local_matrix_;
+  const Polynomial<double, 2> depth_error_function_;
+  std::vector<std::pair<int, int> > indices_;
+  PCLCloud3 part_cloud_;
+
+};
+
+typedef ceres::NumericDiffCostFunction<LocalModelError, ceres::CENTRAL, ceres::DYNAMIC, MathTraits<LocalPolynomial>::Size,
+MathTraits<LocalPolynomial>::Size, MathTraits<LocalPolynomial>::Size, MathTraits<LocalPolynomial>::Size> LocalCostFunction;
+
+void DepthUndistortionEstimation::optimizeLocalModel(const Polynomial<double, 2> & depth_error_function)
+{
+  std::vector<LocalModelError *> all_errors_vec;
+  ceres::Problem problem;
+
+  for (Size1 i = 0; i < data_vec_.size(); ++i)
+  {
+    const DepthData::ConstPtr & data = data_vec_[i];
+    const std::vector<int> & indices = *plane_info_map_[data].indices_;
+
+    int delta_x = data->cloud_->width / local_model_->binSize().x();
+    int delta_y = data->cloud_->height / local_model_->binSize().y();
+
+    std::vector<LocalModelError *> error_vec;
+
+    for (Size1 j = 0; j < delta_y * delta_x; ++j)
+    {
+      error_vec.push_back(new LocalModelError(data->cloud_, plane_info_map_[data].plane_, local_model_, depth_error_function));
+      all_errors_vec.push_back(error_vec.back());
+    }
+
+    for (Size1 j = 0; j < indices.size(); ++j)
+    {
+      int x_index = indices[j] % data->cloud_->width;
+      int y_index = indices[j] / data->cloud_->width;
+      int bin_x = x_index / local_model_->binSize().x();
+      int bin_y = y_index / local_model_->binSize().y();
+      error_vec[bin_x + delta_x * bin_y]->addIndex(x_index, y_index);
+    }
+
+    for (Size1 j = 0; j < error_vec.size(); ++j)
+    {
+      if (error_vec[j]->size() == 0)
+        continue;
+      error_vec[j]->createCloudWithIndices();
+
+      int x_index = j % delta_x;
+      int y_index = j / delta_x;
+
+      ceres::CostFunction * cost_function = new LocalCostFunction(error_vec[j], ceres::DO_NOT_TAKE_OWNERSHIP, 3 * error_vec[j]->size());
+      problem.AddResidualBlock(cost_function, NULL,
+                               local_model_->matrix()->at(x_index, y_index).data(),
+                               local_model_->matrix()->at(x_index, y_index + 1).data(),
+                               local_model_->matrix()->at(x_index + 1, y_index).data(),
+                               local_model_->matrix()->at(x_index + 1, y_index + 1).data());
+
+    }
+
+  }
+
+
+  ceres::Solver::Options options;
+  options.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;
+  options.max_num_iterations = 100;
+  options.minimizer_progress_to_stdout = true;
+  options.num_threads = 8;
+
+  ceres::Solver::Summary summary;
+  ceres::Solve(options, &problem, &summary);
+
+  for (Size1 i = 0; i < all_errors_vec.size(); ++i)
+    delete all_errors_vec[i];
 
 }
 

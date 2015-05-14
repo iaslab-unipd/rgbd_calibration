@@ -125,7 +125,7 @@ public:
 
   void estimateLocalModelReverse();
 
-  void optimizeLocalModel();
+  void optimizeLocalModel(const Polynomial<double, 2> & depth_error_function);
 
   void estimateGlobalModel();
 

@@ -37,6 +37,12 @@ class TestNode
 {
 public:
 
+  enum DepthType
+  {
+    KINECT1_DEPTH,
+    SWISS_RANGER_DEPTH
+  };
+
   TestNode(ros::NodeHandle & node_handle);
 
   virtual ~TestNode()
@@ -96,6 +102,7 @@ protected:
   CalibrationTest::Ptr test_;
 
   Size2 images_size_;
+  DepthType depth_type_;
 
 };
 
