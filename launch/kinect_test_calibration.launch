@@ -1,7 +1,8 @@
 <?xml version="1.0"?>
 <launch>
 
-<arg name="ns" default="calibration" />
+<arg name="ns"  default="calibration" />
+<arg name="dir" default="/tmp" /> 
 
 <group ns="$(arg ns)">
 
@@ -19,8 +20,8 @@
     
     <arg name="downsample_ratio"       default="1" />
     
-    <arg name="local_und_matrix_file"  default="/tmp/local_matrix.txt" />
-    <arg name="global_und_matrix_file" default="/tmp/opt_global_matrix.txt" />
+    <arg name="local_und_matrix_file"  default="$(arg dir)/local_matrix.txt" />
+    <arg name="global_und_matrix_file" default="$(arg dir)/opt_global_matrix.txt" />
     
     <arg name="only_show"              default="false" />
 	
@@ -38,7 +39,7 @@
         
         <param name="depth_type"       value="$(arg depth_type)" />
         
-        <rosparam param="camera_pose" command="load" file="/tmp/camera_pose.yaml" />
+        <rosparam param="camera_pose" command="load" file="$(arg dir)/camera_pose.yaml" />
         
         <param name="downsample_ratio" value="$(arg downsample_ratio)" />
         

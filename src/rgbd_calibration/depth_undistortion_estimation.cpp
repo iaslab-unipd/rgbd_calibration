@@ -31,6 +31,7 @@
 #include <algorithm>
 
 #include <pcl/filters/extract_indices.h>
+#include <pcl/io/pcd_io.h>
 
 #include <calibration_common/ceres/polynomial_fit.h>
 #include <calibration_common/ceres/plane_fit.h>
@@ -51,7 +52,7 @@ bool DepthUndistortionEstimation::extractPlane(const Checkerboard & color_cb,
                                                const Point3 & center,
                                                PlaneInfo & plane_info)
 {
-  Scalar radius = std::min(color_cb.width(), color_cb.height()) / 1.8; // TODO Add parameter
+  Scalar radius = std::min(color_cb.width(), color_cb.height()) / 1.5; // TODO Add parameter
   PointPlaneExtraction<PCLPoint3> plane_extractor;
   plane_extractor.setInputCloud(cloud);
   plane_extractor.setRadius(radius);
@@ -97,7 +98,7 @@ void DepthUndistortionEstimation::estimateLocalModel()
         inverse_global.undistort(0, 0, und_color_cb_center);
       }
 
-      RGBD_INFO(data.id_, "Transformed z: " << gt_cb.center().z() << " -> " << und_color_cb_center.z());
+//      RGBD_INFO(data.id_, "Transformed z: " << gt_cb.center().z() << " -> " << und_color_cb_center.z());
 
       // Undistort cloud
       PCLCloud3::Ptr und_cloud = boost::make_shared<PCLCloud3>(cloud);
@@ -111,8 +112,42 @@ void DepthUndistortionEstimation::estimateLocalModel()
       PlaneInfo plane_info;
       if (extractPlane(gt_cb, und_cloud, und_color_cb_center, plane_info))
       {
-        RGBD_INFO(data.id_, "Plane extracted!!");
+//        RGBD_INFO(data.id_, "Plane extracted!!");
         plane_info_map_[data_vec_[i + th]] = plane_info;
+
+        if (i + th == 73 or i + th == 80)
+        {
+          PCLCloud3::Ptr tmp_und_cloud = boost::make_shared<PCLCloud3>(*und_cloud, *plane_info.indices_);
+          PCLCloud3::Ptr tmp_cloud = boost::make_shared<PCLCloud3>(cloud, *plane_info.indices_);
+
+          std::stringstream ss;
+          pcl::PCDWriter writer;
+          ss <<  "/tmp/tmp_und_cloud_" << i + th <<  ".pcd";
+          writer.write(ss.str(), *und_cloud);
+
+          ss.str("");
+          ss <<  "/tmp/tmp_und_cloud_" << i + th <<  "_plane.pcd";
+          writer.write(ss.str(), *tmp_und_cloud);
+
+          ss.str("");
+          ss <<  "/tmp/tmp_cloud_" << i + th <<  ".pcd";
+          writer.write(ss.str(), cloud);
+
+          ss.str("");
+          ss <<  "/tmp/tmp_cloud_" << i + th <<  "_plane.pcd";
+          writer.write(ss.str(), *tmp_cloud);
+
+          PlaneInfo tmp_plane_info;
+          if (extractPlane(gt_cb, data.cloud_, und_color_cb_center, tmp_plane_info))
+          {
+            PCLCloud3::Ptr tmp_cloud_2 = boost::make_shared<PCLCloud3>(cloud, *tmp_plane_info.indices_);
+
+            ss.str("");
+            ss <<  "/tmp/tmp_cloud_" << i + th <<  "_plane_2.pcd";
+            writer.write(ss.str(), *tmp_cloud_2);
+            std::cout << plane_info.std_dev_ << " -- " << tmp_plane_info.std_dev_ << std::endl;
+          }
+        }
 
 //        Plane fitted_plane = PlaneFit<Scalar>::robustFit(PCLConversion<Scalar>::toPointMatrix(*und_cloud, *plane_info.indices_),
 //                                                         plane_info.std_dev_);
@@ -128,40 +163,9 @@ void DepthUndistortionEstimation::estimateLocalModel()
           if ((r - h/2)*(r - h/2) + (c - w/2)*(c - w/2) < (h/3)*(h/3))
             indices.push_back((*plane_info.indices_)[j]);
         }
-        Plane fitted_plane = PlaneFit<Scalar>::robustFit(PCLConversion<Scalar>::toPointMatrix(*und_cloud, indices), plane_info.std_dev_);
+        Plane fitted_plane = PlaneFit<Scalar>::fit(PCLConversion<Scalar>::toPointMatrix(cloud, indices)/*, plane_info.std_dev_*/);
 
-
-
-
-//        if (th == 0)
-//        {
-//          pcl::visualization::PCLVisualizer viz("VIZ");
-
-//          pcl::PointCloud<pcl::PointXYZRGB>::Ptr colored_cloud = boost::make_shared<pcl::PointCloud<pcl::PointXYZRGB> >(cloud_->width, cloud_->height);
-//          colored_cloud->is_dense = und_cloud->is_dense;
-
-//          for (size_t i = 0; i < und_cloud->size(); ++i)
-//          {
-//            colored_cloud->points[i].x = und_cloud->points[i].x;
-//            colored_cloud->points[i].y = und_cloud->points[i].y;
-//            colored_cloud->points[i].z = und_cloud->points[i].z;
-//            colored_cloud->points[i].r = 0;
-//            colored_cloud->points[i].g = 125;
-//            colored_cloud->points[i].b = 255;
-//          }
-
-//          for (size_t i = 0; i < plane_info.indices_->size(); ++i)
-//          {
-//            colored_cloud->points[(*plane_info.indices_)[i]].r = 255;
-//            colored_cloud->points[(*plane_info.indices_)[i]].g = 255;
-//            colored_cloud->points[(*plane_info.indices_)[i]].b = 0;
-//          }
-
-//          viz.addPointCloud(colored_cloud, "cloud");
-//          viz.spin();
-
-//        }
-
+        plane_info_map_[data_vec_[i + th]].plane_ = fitted_plane;
 
 
 #pragma omp critical
@@ -179,7 +183,8 @@ void DepthUndistortionEstimation::estimateLocalModel()
         }
 
         Line line(gt_cb.center(), Point3::UnitZ());
-        RGBD_INFO(data.id_, "Real z: " << line.intersectionPoint(fitted_plane).z());
+        RGBD_INFO(data.id_, "Transformed z: " << gt_cb.center().z() << " -> " << und_color_cb_center.z()
+                                              << " (Real z: " << line.intersectionPoint(fitted_plane).z() << ")");
 
 //      Scalar angle = RAD2DEG(std::acos(plane_info.equation_.normal().dot(gt_cb.plane().normal())));
 //      RGBD_INFO(data.id(), "Angle: " << angle);
@@ -221,7 +226,7 @@ void DepthUndistortionEstimation::estimateLocalModelReverse()
         inverse_global.undistort(0, 0, und_color_cb_center);
       }
 
-      RGBD_INFO(data.id_, "Transformed z: " << gt_cb.center().z() << " -> " << und_color_cb_center.z());
+//      RGBD_INFO(data.id_, "Transformed z: " << gt_cb.center().z() << " -> " << und_color_cb_center.z());
 
       // Undistort cloud
       PCLCloud3::Ptr und_cloud = boost::make_shared<PCLCloud3>(cloud);
@@ -235,7 +240,7 @@ void DepthUndistortionEstimation::estimateLocalModelReverse()
       PlaneInfo plane_info;
       if (extractPlane(gt_cb, und_cloud, und_color_cb_center, plane_info))
       {
-        RGBD_INFO(data.id_, "Plane extracted!!");
+//        RGBD_INFO(data.id_, "Plane extracted!!");
 
 //        Plane fitted_plane = PlaneFit<Scalar>::robustFit(PCLConversion<Scalar>::toPointMatrix(*und_cloud, *plane_info.indices_),
 //                                                         plane_info.std_dev_);
@@ -251,7 +256,7 @@ void DepthUndistortionEstimation::estimateLocalModelReverse()
           if ((r - h/2)*(r - h/2) + (c - w/2)*(c - w/2) < (h/3)*(h/3))
             indices->push_back((*plane_info.indices_)[j]);
         }
-        Plane fitted_plane = PlaneFit<Scalar>::robustFit(PCLConversion<Scalar>::toPointMatrix(*und_cloud, *indices), plane_info.std_dev_);
+        Plane fitted_plane = PlaneFit<Scalar>::fit(PCLConversion<Scalar>::toPointMatrix(cloud, *indices)/*, plane_info.std_dev_*/);
 
 
         boost::shared_ptr<std::vector<int> > old_indices;
@@ -270,7 +275,8 @@ void DepthUndistortionEstimation::estimateLocalModelReverse()
         }
 
         Line line(gt_cb.center(), Point3::UnitZ());
-        RGBD_INFO(data.id_, "Real z: " << line.intersectionPoint(fitted_plane).z());
+        RGBD_INFO(data.id_, "Transformed z: " << gt_cb.center().z() << " -> " << und_color_cb_center.z()
+                                              << " (Real z: " << line.intersectionPoint(fitted_plane).z() << ")");
 
       }
       else
@@ -349,6 +355,7 @@ public:
 
       Point3 p(tmp_cloud.points[i].x * k, tmp_cloud.points[i].y * k, depth);
       Line line(Vector3::Zero(), p.normalized());
+//      residuals[i] = (p - line.intersectionPoint(plane_)).norm() / ceres::poly_eval(depth_error_function_.coefficients(), p.z());
       residuals_map.col(i) = (p - line.intersectionPoint(plane_)) / ceres::poly_eval(depth_error_function_.coefficients(), p.z());
     }
 
@@ -408,6 +415,7 @@ void DepthUndistortionEstimation::optimizeLocalModel(const Polynomial<double, 2>
       int x_index = j % delta_x;
       int y_index = j / delta_x;
 
+//      ceres::CostFunction * cost_function = new LocalCostFunction(error_vec[j], ceres::DO_NOT_TAKE_OWNERSHIP, error_vec[j]->size());
       ceres::CostFunction * cost_function = new LocalCostFunction(error_vec[j], ceres::DO_NOT_TAKE_OWNERSHIP, 3 * error_vec[j]->size());
       problem.AddResidualBlock(cost_function, NULL,
                                local_model_->matrix()->at(x_index, y_index).data(),
@@ -422,7 +430,7 @@ void DepthUndistortionEstimation::optimizeLocalModel(const Polynomial<double, 2>
 
   ceres::Solver::Options options;
   options.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;
-  options.max_num_iterations = 100;
+  options.max_num_iterations = 10;
   options.minimizer_progress_to_stdout = true;
   options.num_threads = 8;
 

@@ -136,7 +136,7 @@ void Publisher::publish(const RGBDData & rgbd)
 
   DataPublisherSet & pub_set = d_pub_map_[rgbd.id()];
 
-  rgbd.depthData()->header.stamp = ros::Time::now().toNSec();
+//  rgbd.depthData()->header.stamp = ros::Time::now().toNSec();
   pub_set.cloud_pub_.publish(*rgbd.depthData());
   rgbd.fuseData();
   pub_set.rgbd_pub_.publish(*rgbd.fusedData());

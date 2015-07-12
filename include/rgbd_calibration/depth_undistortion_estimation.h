@@ -89,12 +89,14 @@ public:
   {
     local_model_ = local_model;
     local_fit_ = boost::make_shared<LocalMatrixFitPCL>(local_model_);
+    local_fit_->setDepthErrorFunction(depth_error_function_);
   }
 
   inline void setGlobalModel(const GlobalModel::Ptr & global_model)
   {
     global_model_ = global_model;
     global_fit_ = boost::make_shared<GlobalMatrixFitPCL>(global_model_);
+    global_fit_->setDepthErrorFunction(depth_error_function_);
     InverseGlobalModel::Data::Ptr matrix = boost::make_shared<InverseGlobalModel::Data>(Size2(1, 1), GlobalPolynomial::IdentityCoefficients());
     inverse_global_model_ = boost::make_shared<InverseGlobalModel>(global_model_->imageSize());
     inverse_global_model_->setMatrix(matrix);
@@ -162,6 +164,11 @@ public:
 //    return eigen_samples;
 //  }
 
+  void setDepthErrorFunction(const Polynomial<Scalar, 2> & depth_error_function)
+  {
+    depth_error_function_ = depth_error_function;
+  }
+
 private:
 
   bool extractPlane(const Checkerboard & color_cb,
@@ -183,6 +190,7 @@ private:
   std::vector<DepthData::Ptr> data_vec_;
 
   std::map<DepthData::ConstPtr, PlaneInfo> plane_info_map_;
+  Polynomial<Scalar, 2> depth_error_function_;
 
 };
 

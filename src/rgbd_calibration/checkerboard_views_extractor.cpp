@@ -59,7 +59,7 @@ Size1 CheckerboardViewsExtraction::extract(const RGBDData::ConstPtr & data,
   {
     const Checkerboard::ConstPtr & cb = cb_vec_[c];
 
-    plane_extractor->setRadius(std::min(cb->width(), cb->height()) / 1.8);
+    plane_extractor->setRadius(std::min(cb->width(), cb->height()) / 1.5);
 
     std::stringstream ss;
     ss << "rgbd_cb_" << data->id() << "_" << c;

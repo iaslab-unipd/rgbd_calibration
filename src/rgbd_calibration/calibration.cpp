@@ -198,6 +198,8 @@ void Calibration::perform()
     cb_extractor.setOnlyImages(true);
     cb_extractor.extractAll(cb_views_vec_);
 
+    ROS_INFO_STREAM(cb_views_vec_.size());
+
     for (Size1 i = 0; i < cb_views_vec_.size(); ++i)
     {
       CheckerboardViews & cb_views = *cb_views_vec_[i];
@@ -206,9 +208,14 @@ void Calibration::perform()
       depth_data_vec_.push_back(depth_undistortion_estimation_->addDepthData(cb_views.data()->depthData(), cb));
     }
 
+    ROS_INFO_STREAM("Estimating undistortion map...");
     depth_undistortion_estimation_->estimateLocalModel();
+    ROS_INFO_STREAM("Recomputing undistortion map...");
     depth_undistortion_estimation_->estimateLocalModelReverse();
-    depth_undistortion_estimation_->optimizeLocalModel(depth_sensor_->depthErrorFunction());
+//    std::cout << "Local Polynomial at (" << 10 << ", " << 10 << "): " << local_model_->polynomial(10, 10).transpose() << std::endl;
+//    ROS_INFO_STREAM("Optimizing undistortion map...");
+//    depth_undistortion_estimation_->optimizeLocalModel(depth_sensor_->depthErrorFunction());
+    ROS_INFO_STREAM("Estimating global error correction map...");
     depth_undistortion_estimation_->estimateGlobalModel();
 
     for (Size1 i = 0; i < cb_views_vec_.size(); ++i)
@@ -236,18 +243,18 @@ void Calibration::perform()
 //    PolynomialUndistortionMatrixIO<GlobalPolynomial> io2;
 //    io2.write(*global_und_->model(), "/tmp/global_matrix.txt");
 
-//    for (int i = 0; i < 5; ++i)
-//    {
-      std::cout << "Local Polynomial at (" << 1 << ", " << 1 << "): " << local_model_->polynomial(1, 1).transpose() << std::endl;
+////    for (int i = 0; i < 5; ++i)
+////    {
+//      std::cout << "Local Polynomial at (" << 10 << ", " << 10 << "): " << local_model_->polynomial(10, 10).transpose() << std::endl;
 
-      std::stringstream ss;
-      ss << "/tmp/local_samples_" << 1 << "_" << 1 << ".txt";
+//      std::stringstream ss;
+//      ss << "/tmp/local_samples_" << 10 << "_" << 10 << ".txt";
 
-      std::fstream fs;
-      fs.open(ss.str().c_str(), std::fstream::out);
-      fs << depth_undistortion_estimation_->getLocalSamples(1, 1) << std::endl;
-      fs.close();
-//    }
+//      std::fstream fs;
+//      fs.open(ss.str().c_str(), std::fstream::out);
+//      fs << depth_undistortion_estimation_->getLocalSamples(10, 10) << std::endl;
+//      fs.close();
+////    }
 
 //    for (int i = 0; i < 4; ++i)
 //    {
@@ -513,7 +520,7 @@ public:
       typename Types<T>::Cloud3 depth_points(depth_points_.size());
       depth_points.container() = depth_points_.container().cast<T>();
       global.undistort(depth_points);
-
+/*
 //      typename Types<T>::Plane depth_plane(PlaneFit<T>::fit(typename Types<T>::Cloud3(depth_points, plane_indices_)));
 
 //      typename Types<T>::Cloud3 cb_corners(checkerboard_->corners().size());
@@ -544,32 +551,43 @@ public:
 //      residuals[5 * cb_corners.elements()    ] = (normal - depth_plane.normal()).x() * cb_corners.elements();
 //      residuals[5 * cb_corners.elements() + 1] = (normal - depth_plane.normal()).y() * cb_corners.elements();
 //      residuals[5 * cb_corners.elements() + 2] = (normal - depth_plane.normal()).z() * cb_corners.elements();
-
+*/
       typename Types<T>::Cloud3 cb_corners(checkerboard_->corners().size());
       cb_corners.container() = checkerboard_pose_eigen * checkerboard_->corners().container().cast<T>();
       typename Types<T>::Cloud2 reprojected_corners = camera_model_->project3dToPixel<T>(cb_corners);
       cb_corners.transform(color_sensor_pose_eigen);
 
-      Polynomial<T, 2> depth_error_function(depth_error_function_.coefficients().cast<T>());
-
       Eigen::Map<Eigen::Matrix<T, 2, Eigen::Dynamic> > residual_map_corners_2d(residuals, 2, cb_corners.elements());
-      residual_map_corners_2d = (reprojected_corners.container() - image_corners_.container().cast<T>()) / (0.25 * cb_corners.elements());
+      residual_map_corners_2d = (reprojected_corners.container() - image_corners_.container().cast<T>()) / (0.2/* * std::sqrt(T(cb_corners.elements()))*/);
+
+      Polynomial<T, 2> depth_error_function(depth_error_function_.coefficients().cast<T>());
 
 //      Eigen::Map<Eigen::Matrix<T, 3, Eigen::Dynamic> > residual_map_corners_3d(&residuals[2 * cb_corners.elements()], 3, cb_corners.elements());
 //      typename Types<T>::Plane depth_plane(PlaneFit<T>::fit(typename Types<T>::Cloud3(depth_points, plane_indices_)));
 //      for (Size1 i = 0; i < cb_corners.elements(); ++i)
 //      {
 //        Line line(Point3::Zero(), cb_corners[i].normalized());
-//        residual_map_corners_3d.col(i) = (line.intersectionPoint(depth_plane) - cb_corners[i]) / (0.01 * cb_corners.elements());
+//        residual_map_corners_3d.col(i) = (line.intersectionPoint(depth_plane) - cb_corners[i]) / (ceres::poly_eval(depth_error_function.coefficients(), cb_corners[i].z()));
 //      }
 
-      Eigen::Map<Eigen::Matrix<T, 3, Eigen::Dynamic> > residual_map_dist(&residuals[2 * cb_corners.elements()], 3, plane_indices_.size());
+      typename Types<T>::Plane depth_plane(PlaneFit<T>::fit(typename Types<T>::Cloud3(depth_points, plane_indices_)));
       typename Types<T>::Plane cb_plane = Types<T>::Plane::Through(cb_corners(0, 0), cb_corners(0, 1), cb_corners(1, 0));
+
+      Eigen::Map<Eigen::Matrix<T, 4, 1> > residual_map_plane(&residuals[2 * cb_corners.elements()], 4, 1);
+      if (depth_plane.offset() * cb_plane.offset() > 0)
+        residual_map_plane = depth_plane.coeffs() - cb_plane.coeffs();
+      else
+        residual_map_plane = depth_plane.coeffs() + cb_plane.coeffs();
+
+      residual_map_plane.template head<3>() *= std::acos(depth_plane.normal().dot(cb_plane.normal())) * 180 / M_PI / 0.5;
+      residual_map_plane[3] /= 0.01;
+
+      Eigen::Map<Eigen::Matrix<T, 3, Eigen::Dynamic> > residual_map_dist(&residuals[4 + 2 * cb_corners.elements()], 3, plane_indices_.size());
       for (Size1 i = 0; i < plane_indices_.size(); ++i)
       {
         Line line(Point3::Zero(), depth_points[plane_indices_[i]].normalized());
         residual_map_dist.col(i) = (line.intersectionPoint(cb_plane) - depth_points[plane_indices_[i]]) /
-            (plane_indices_.size() * ceres::poly_eval(depth_error_function.coefficients(), depth_points[plane_indices_[i]].z()));
+            (std::sqrt(T(plane_indices_.size())) * ceres::poly_eval(depth_error_function.coefficients(), depth_points[plane_indices_[i]].z()));
       }
 
       return true;
@@ -659,7 +677,9 @@ void Calibration::optimizeAll(const std::vector<CheckerboardViews::Ptr> & cb_vie
 
       cost_function = new TransformDistortionCostFunction(error,
                                                           ceres::DO_NOT_TAKE_OWNERSHIP,
-                                                          3 * downsampled_indices.size() + 2 * cb_views.checkerboard()->size());
+                                                          //4 + 2 * cb_views.checkerboard()->size());
+                                                          4 + 3 * downsampled_indices.size() + 2 * cb_views.checkerboard()->size());
+                                                          //5 * cb_views.checkerboard()->size());
 
     }
     else
@@ -674,11 +694,13 @@ void Calibration::optimizeAll(const std::vector<CheckerboardViews::Ptr> & cb_vie
 
      cost_function = new TransformDistortionCostFunction(error,
                                                          ceres::DO_NOT_TAKE_OWNERSHIP,
-                                                         3 * cb_views.depthView()->points().size() + 2 * cb_views.checkerboard()->size());
+                                                         //4 + 2 * cb_views.checkerboard()->size());
+                                                         4 + 3 * cb_views.depthView()->points().size() + 2 * cb_views.checkerboard()->size());
+                                                         //5 * cb_views.checkerboard()->size());
     }
 
     problem.AddResidualBlock(cost_function,
-                             new ceres::CauchyLoss(1.0),
+                             NULL,//new ceres::CauchyLoss(1.0),
                              transform.data(),
                              global_matrix_->model()->dataPtr(),
                              data.row(i).data());
@@ -698,6 +720,43 @@ void Calibration::optimizeAll(const std::vector<CheckerboardViews::Ptr> & cb_vie
   translation.vector() = transform.tail<3>();
 
   color_sensor_->setPose(translation * rotation);
+
+
+  const int DEGREE = MathTraits<GlobalPolynomial>::Degree;
+  const int MIN_DEGREE = MathTraits<GlobalPolynomial>::MinDegree;
+  const int SIZE = DEGREE - MIN_DEGREE + 1;
+  typedef MathTraits<GlobalPolynomial>::Coefficients Coefficients;
+
+
+  GlobalPolynomial p1(global_matrix_->model()->polynomial(0, 0));
+  GlobalPolynomial p2(global_matrix_->model()->polynomial(0, 1));
+  GlobalPolynomial p3(global_matrix_->model()->polynomial(1, 0));
+
+
+  Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic> A(SIZE, SIZE);
+  Eigen::Matrix<Scalar, Eigen::Dynamic, 1> b(SIZE, 1);
+  for (int i = 0; i < SIZE; ++i)
+  {
+    Scalar x(i + 1);
+    Scalar y =  p2.evaluate(x) + p3.evaluate(x)- p1.evaluate(x);
+    Scalar tmp(1.0);
+    for (int j = 0; j < MIN_DEGREE; ++j)
+      tmp *= x;
+    for (int j = 0; j < SIZE; ++j)
+    {
+      A(i, j) = tmp;
+      tmp *= x;
+    }
+    b[i] = y;
+  }
+
+  Eigen::Matrix<Scalar, Eigen::Dynamic, 1> x = A.colPivHouseholderQr().solve(b);
+
+  global_matrix_->model()->polynomial(1, 1) = x;
+
+
+
+
 }
 
 void Calibration::optimize()

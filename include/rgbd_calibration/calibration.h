@@ -91,6 +91,7 @@ public:
     estimate_depth_und_model_ = true;
 
     depth_undistortion_estimation_ = boost::make_shared<DepthUndistortionEstimation>();
+    depth_undistortion_estimation_->setDepthErrorFunction(depth_sensor_->depthErrorFunction());
     depth_undistortion_estimation_->setLocalModel(local_model_);
     depth_undistortion_estimation_->setGlobalModel(global_model_);
     depth_undistortion_estimation_->setMaxThreads(8);

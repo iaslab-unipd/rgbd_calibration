@@ -19,10 +19,13 @@
 #include <rgbd_calibration/checkerboard_views_extractor.h>
 
 #include <calibration_common/base/pcl_conversion.h>
+#include <kinect/depth/polynomial_matrix_io.h>
 
 #include <pcl/filters/random_sample.h>
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/filters/passthrough.h>
+
+#include <pcl/io/pcd_io.h>
 
 #include <pcl/visualization/point_cloud_color_handlers.h>
 
@@ -55,14 +58,55 @@ void CalibrationTest::addData(const cv::Mat & image,
 //  std::vector<int> remapping;
 //  pcl::removeNaNFromPointCloud(*cloud, *new_cloud, remapping);
 
-//  if (ratio_ > 1)
-//  {
-//    pcl::RandomSample<PCLPoint3> random_sample;
-//    random_sample.setInputCloud(new_cloud);
-//    random_sample.setSample(new_cloud->size() / ratio_);
-//    random_sample.setSeed(rand());
-//    random_sample.filter(*new_cloud);
-//  }
+  PCLCloud3::Ptr new_cloud = boost::make_shared<PCLCloud3>(*cloud);
+
+  if (ratio_ > 1)
+  {
+    new_cloud = boost::make_shared<PCLCloud3>();
+    new_cloud->resize(cloud->size() / (ratio_ * ratio_));
+    new_cloud->header = cloud->header;
+    new_cloud->width = cloud->width / ratio_;
+    new_cloud->height = cloud->height / ratio_;
+    new_cloud->is_dense = cloud->is_dense;
+
+    PCLPoint3 zero(0, 0, 0);
+    float nan = std::numeric_limits<float>::quiet_NaN();
+    PCLPoint3 bad_point(nan, nan, nan);
+
+    for (Size1 i = 0; i < new_cloud->height; ++i)
+    {
+      for (Size1 j = 0; j < new_cloud->width; ++j)
+      {
+        new_cloud->at(j, i) = zero;
+        int count = 0;
+        for (Size1 di = 0; di < ratio_; ++di)
+        {
+          for (Size1 dj = 0; dj < ratio_; ++dj)
+          {
+            const PCLPoint3 & p = cloud->at(j * ratio_ + dj, i * ratio_ + di);
+            if (pcl::isFinite(p))
+            {
+              ++count;
+              new_cloud->at(j, i).x += p.x;
+              new_cloud->at(j, i).y += p.y;
+              new_cloud->at(j, i).z += p.z;
+            }
+          }
+        }
+        if (count > 0)
+        {
+          new_cloud->at(j, i).x /= count;
+          new_cloud->at(j, i).y /= count;
+          new_cloud->at(j, i).z /= count;
+        }
+        else
+        {
+          new_cloud->at(j, i) = bad_point;
+          new_cloud->is_dense = false;
+        }
+      }
+    }
+  }
 
   int index = data_vec_.size() + 1;
 
@@ -73,9 +117,9 @@ void CalibrationTest::addData(const cv::Mat & image,
   data->setColorSensor(color_sensor_);
   data->setDepthSensor(depth_sensor_);
   data->setColorData(rectified);
-  data->setDepthData(*cloud);
+  data->setDepthData(*new_cloud);
 
-  PCLCloud3::Ptr part_und_cloud = boost::make_shared<PCLCloud3>(*cloud);
+  PCLCloud3::Ptr part_und_cloud = boost::make_shared<PCLCloud3>(*new_cloud);
   local_matrix_->undistort(*part_und_cloud);
 
   RGBDData::Ptr part_und_data(boost::make_shared<RGBDData>(index));
@@ -106,35 +150,35 @@ void CalibrationTest::addData(const cv::Mat & image,
   //    z += und_cloud->points[i].z;
   //  z /= und_cloud->size();
 
-  //  PCLCloud::Ptr tmp_cloud = boost::make_shared<PCLCloud>();
-  //  pcl::PassThrough<pcl::PointXYZ> pass;
-  //  pass.setInputCloud(new_cloud);
-  //  pass.setFilterFieldName("y");
-  //  pass.setFilterLimits(-3.0f, 1.0f);
-  //  pass.filter(*tmp_cloud);
-  //
-  //  pcl::VoxelGrid<pcl::PointXYZ> voxel;
-  //  voxel.setInputCloud(tmp_cloud);
-  //  voxel.setLeafSize(0.05f, 10.0f, 0.05f);
-  //  voxel.filter(*tmp_cloud);
-  //
-  //  std::fstream fs;
-  //  fs.open("/tmp/points.txt", std::fstream::out | std::fstream::app);
-  //  for (size_t i = 0; i < tmp_cloud->size(); ++i)
-  //    fs << tmp_cloud->points[i].x << " " << tmp_cloud->points[i].z << " " << tmp_cloud->points[i].y << std::endl;
-  //  fs << "------------------------------------------------------------------" << std::endl;
-  //  fs.close();
-  //
-  //  pass.setInputCloud(und_cloud);
-  //  pass.filter(*tmp_cloud);
-  //  voxel.setInputCloud(tmp_cloud);
-  //  voxel.filter(*tmp_cloud);
-  //
-  //  fs.open("/tmp/und_points.txt", std::fstream::out | std::fstream::app);
-  //  for (size_t i = 0; i < tmp_cloud->size(); ++i)
-  //    fs << tmp_cloud->points[i].x << " " << tmp_cloud->points[i].z << " " << tmp_cloud->points[i].y << std::endl;
-  //  fs << "------------------------------------------------------------------" << std::endl;
-  //  fs.close();
+//    PCLCloud3::Ptr tmp_cloud = boost::make_shared<PCLCloud3>();
+//    pcl::PassThrough<pcl::PointXYZ> pass;
+//    pass.setInputCloud(cloud);
+//    pass.setFilterFieldName("y");
+//    pass.setFilterLimits(-10.0f, 10.0f);
+//    pass.filter(*tmp_cloud);
+
+//    pcl::VoxelGrid<pcl::PointXYZ> voxel;
+//    voxel.setInputCloud(tmp_cloud);
+//    voxel.setLeafSize(0.05f, 10.0f, 0.05f);
+//    voxel.filter(*tmp_cloud);
+
+//    std::fstream fs;
+//    fs.open("/tmp/points.txt", std::fstream::out | std::fstream::app);
+//    for (size_t i = 0; i < tmp_cloud->size(); ++i)
+//      fs << tmp_cloud->points[i].x << " " << tmp_cloud->points[i].z << " " << tmp_cloud->points[i].y << std::endl;
+//    fs << "------------------------------------------------------------------" << std::endl;
+//    fs.close();
+
+//    pass.setInputCloud(und_cloud);
+//    pass.filter(*tmp_cloud);
+//    voxel.setInputCloud(tmp_cloud);
+//    voxel.filter(*tmp_cloud);
+
+//    fs.open("/tmp/und_points.txt", std::fstream::out | std::fstream::app);
+//    for (size_t i = 0; i < tmp_cloud->size(); ++i)
+//      fs << tmp_cloud->points[i].x << " " << tmp_cloud->points[i].z << " " << tmp_cloud->points[i].y << std::endl;
+//    fs << "------------------------------------------------------------------" << std::endl;
+//    fs.close();
 
 }
 
@@ -143,7 +187,7 @@ void CalibrationTest::visualizeClouds() const
 
   pcl::visualization::PCLVisualizer viz1("Test Set Visualization");
 
-  PCLCloud3::Ptr fake_cloud = boost::make_shared<PCLCloud3>(640, 480);
+  PCLCloud3::Ptr fake_cloud = boost::make_shared<PCLCloud3>(640/ratio_, 480/ratio_);
   const PinholeCameraModel & camera_model = *color_sensor_->cameraModel();
 
   pcl::visualization::PointCloudColorHandlerGenericField<PCLPoint3> color_handler(fake_cloud, "z");
@@ -167,6 +211,21 @@ void CalibrationTest::visualizeClouds() const
     local_matrix_->undistort(*fake_cloud);
     //global_matrix_->undistort(*fake_cloud);
 
+    std::stringstream fss;
+    fss << "/tmp/fake_cloud_" << static_cast<int>(s * 10) << ".txt";
+    std::ofstream fs(fss.str().c_str());
+
+    for (size_t j = 0; j < fake_cloud->height; ++j)
+    {
+      for (size_t i = 0; i < fake_cloud->width - 1; ++i)
+      {
+        fs << fake_cloud->at(i, j).z << ", ";
+      }
+      fs << fake_cloud->at(fake_cloud->width - 1, j).z << ";" << std::endl;
+    }
+
+    fs.close();
+
     std::stringstream ss;
     ss << "cloud_" << s;
     viz1.addPointCloud(fake_cloud, color_handler, ss.str());
@@ -185,9 +244,12 @@ void CalibrationTest::visualizeClouds() const
   int ORIGINAL = 0, UNDISTORTED = 1, FINAL = 2;
 
   pcl::visualization::PCLVisualizer viz("Test Set Visualization");
-  viz.createViewPort(0.0, 0.0, 0.33, 1.0, ORIGINAL);
-  viz.createViewPort(0.33, 0.0, 0.67, 1.0, UNDISTORTED);
-  viz.createViewPort(0.67, 0.0, 1.0, 1.0, FINAL);
+//  viz.createViewPort(0.0, 0.0, 0.33, 1.0, ORIGINAL);
+//  viz.createViewPort(0.33, 0.0, 0.67, 1.0, UNDISTORTED);
+//  viz.createViewPort(0.67, 0.0, 1.0, 1.0, FINAL);
+
+  viz.createViewPort(0.0, 0.0, 0.5, 1.0, ORIGINAL);
+  viz.createViewPort(0.5, 0.0, 1.0, 1.0, FINAL);
   viz.addCoordinateSystem();
 
   std::vector<double> plane_distances(12);
@@ -212,34 +274,69 @@ void CalibrationTest::visualizeClouds() const
     const RGBDData::ConstPtr & part_und_data = part_und_data_vec_[index];
     const RGBDData::ConstPtr & und_data = und_data_vec_[index];
 
-    data->fuseData();
-    part_und_data->fuseData();
-    und_data->fuseData();
-    viz.addPointCloud(data->fusedData(), ss.str(), ORIGINAL);
-    viz.addPointCloud(part_und_data->fusedData(), ss.str() + "_und", UNDISTORTED);
-    viz.addPointCloud(und_data->fusedData(), ss.str() + "_final", FINAL);
+//    data->fuseData();
+//    part_und_data->fuseData();
+//    und_data->fuseData();
+//    viz.addPointCloud(data->fusedData(), ss.str(), ORIGINAL);
+//    viz.addPointCloud(part_und_data->fusedData(), ss.str() + "_und", UNDISTORTED);
+//    viz.addPointCloud(und_data->fusedData(), ss.str() + "_final", FINAL);
 
-    pcl::ModelCoefficients coeffs;
-    coeffs.values.resize(4);
-    coeffs.values[0] = 0.00582574;
-    coeffs.values[1] = 0.0834788;
-    coeffs.values[2] = 0.996493;
-    coeffs.values[3] = -plane_distances[index];
+//    pcl::ModelCoefficients coeffs;
+//    coeffs.values.resize(4);
+//    coeffs.values[0] = 0.00582574;
+//    coeffs.values[1] = 0.0834788;
+//    coeffs.values[2] = 0.996493;
+//    coeffs.values[3] = -plane_distances[index];
 
-    ss.str("");
-    ss << "plane_" << index;
-    viz.addPlane(coeffs, ss.str());
-    viz.setShapeRenderingProperties(pcl::visualization::PCL_VISUALIZER_COLOR, 1.0, 0.1, 0.1, ss.str());
-    viz.setShapeRenderingProperties(pcl::visualization::PCL_VISUALIZER_OPACITY, 0.5, ss.str());
+//    ss.str("");
+//    ss << "plane_" << index;
+//    viz.addPlane(coeffs, ss.str());
+//    viz.setShapeRenderingProperties(pcl::visualization::PCL_VISUALIZER_COLOR, 1.0, 0.1, 0.1, ss.str());
+//    viz.setShapeRenderingProperties(pcl::visualization::PCL_VISUALIZER_OPACITY, 0.5, ss.str());
+
+    typedef pcl::visualization::PointCloudColorHandlerGenericField<PCLPoint3> ColorHandler;
+
+    viz.addPointCloud(data->depthData(), ColorHandler(data->depthData(), "y"), ss.str(), ORIGINAL);
+    //viz.addPointCloud(part_und_data->depthData(), ColorHandler(part_und_data->depthData(), "y"), ss.str() + "_und", UNDISTORTED);
+    viz.addPointCloud(und_data->depthData(), ColorHandler(und_data->depthData(), "y"), ss.str() + "_final", FINAL);
+    viz.setCameraPosition(0, -20, 4.38, 0.344644, 0.313943, 2.74408, 0.000739467, 0.0778838, 0.996962);
+    viz.setCameraFieldOfView(30 * M_PI / 180);
+    viz.setCameraClipDistances(16.8601, 25.7878);
+    viz.setPosition(65, 24);
+    viz.setSize(1855, 1056);
 
   }
 
-  viz.setBackgroundColor(0.08, 0.08, 0.08, UNDISTORTED);
+  for (int j = 1; j <= 5; j += 2)
+  {
+    std::stringstream ss;
+    ss << j << "m";
+    PCLPoint3 p1, p2;
+    p1.x = -5; p1.y = 0; p1.z = j;
+    p2.x =  5; p2.y = 0; p2.z = j;
+    viz.addLine(p1, p2, 0, 0, 0, ss.str() + "_o", ORIGINAL);
+    //viz.addLine(p1, p2, 0, 0, 0, ss.str() + "_u", UNDISTORTED);
+    viz.addLine(p1, p2, 0, 0, 0, ss.str() + "_f", FINAL);
+  }
 
-  viz.addText("TEST SET - VISUALIZATION", 20, 1010, 30, 1.0, 1.0, 1.0, "test_set_text", ORIGINAL);
-  viz.addText("ORIGINAL CLOUDS", 20, 20, 30, 1.0, 1.0, 1.0, "original_text", ORIGINAL);
-  viz.addText("UNDISTORTED CLOUDS", 20, 20, 30, 1.0, 1.0, 1.0, "undistorted_text", UNDISTORTED);
-  viz.addText("FINAL CLOUDS", 20, 20, 30, 1.0, 1.0, 1.0, "final_text", FINAL);
+//  viz.setBackgroundColor(0.08, 0.08, 0.08, UNDISTORTED);
+  viz.setBackgroundColor(1.0, 1.0, 1.0, ORIGINAL);
+  //viz.setBackgroundColor(1.0, 1.0, 1.0, UNDISTORTED);
+  viz.setBackgroundColor(1.0, 1.0, 1.0, FINAL);
+
+  std::stringstream ss;
+  ss << "/home/filippo/Desktop/test/"
+     << color_sensor_->cameraModel()->tfFrame() << "_"
+     << MathTraits<LocalPolynomial>::MinDegree << "-" << MathTraits<LocalPolynomial>::Degree << "_"
+     << local_matrix_->model()->binSize().x() << "x" << local_matrix_->model()->binSize().y() << ".pcd";
+
+  pcl::PCDWriter writer;
+  writer.write(ss.str(), *und_data_vec_[9]->depthData());
+
+//  viz.addText("TEST SET - VISUALIZATION", 20, 1010, 30, 1.0, 1.0, 1.0, "test_set_text", ORIGINAL);
+//  viz.addText("ORIGINAL CLOUDS", 20, 20, 30, 1.0, 1.0, 1.0, "original_text", ORIGINAL);
+//  viz.addText("UNDISTORTED CLOUDS", 20, 20, 30, 1.0, 1.0, 1.0, "undistorted_text", UNDISTORTED);
+//  viz.addText("FINAL CLOUDS", 20, 20, 30, 1.0, 1.0, 1.0, "final_text", FINAL);
 
   /*ros::Rate rate = ros::Rate(100.0);
   for (int i = 0; i < 500; ++i)
@@ -315,6 +412,21 @@ void CalibrationTest::visualizeClouds() const
 
 void CalibrationTest::testPlanarityError() const
 {
+  PolynomialUndistortionMatrixIO<LocalPolynomial> io;
+  io.write(*local_matrix_->model(), "/tmp/local_matrix.txt");
+
+  int index = 0;
+  for (Scalar i = 1.0; i < 5.5; i += 0.125, ++index)
+  {
+    Scalar max;
+    std::stringstream ss;
+    ss << "/tmp/matrix_"<< index << ".png";
+    io.writeImageAuto(*local_matrix_->model(), i, ss.str(), max);
+    ROS_INFO_STREAM("Max " << i << ": " << max);
+  }
+
+
+
   std::vector<CheckerboardViews::Ptr> cb_views_vec;
 
   CheckerboardViewsExtraction cb_extractor;
@@ -323,13 +435,16 @@ void CalibrationTest::testPlanarityError() const
   cb_extractor.setInputData(und_data_vec_);
   cb_extractor.extractAll(cb_views_vec);
 
+  std::map<Scalar, std::vector<Scalar> > data_map;
+
+
   for (size_t i = 0; i < cb_views_vec.size(); ++i)
   {
     const CheckerboardViews & cb_views = *cb_views_vec[i];
     RGBDData::ConstPtr und_data = cb_views.data();
     RGBDData::ConstPtr data = data_map_.at(und_data);
 
-    const Cloud3 & und_points = PCLConversion<Scalar>::toPointMatrix(*und_data->depthData()/*, *cb_views.planeInliers()*/);
+    const Cloud3 & und_points = PCLConversion<Scalar>::toPointMatrix(*und_data->depthData(), *cb_views.planeInliers());
     Plane und_plane = PlaneFit<Scalar>::fit(und_points);
 
     Scalar d_mean = 0;
@@ -353,9 +468,9 @@ void CalibrationTest::testPlanarityError() const
     d_mean /= count;
     und_mean /= count;
     und_var /= count;
-    und_var -= und_mean * und_mean;
+    //und_var -= und_mean * und_mean;
 
-    const Cloud3 points = PCLConversion<Scalar>::toPointMatrix(*data->depthData()/*, *cb_views.planeInliers()*/);
+    const Cloud3 points = PCLConversion<Scalar>::toPointMatrix(*data->depthData(), *cb_views.planeInliers());
     Plane plane = PlaneFit<Scalar>::fit(points);
 
     Scalar mean = 0;
@@ -374,11 +489,35 @@ void CalibrationTest::testPlanarityError() const
 
     mean /= count;
     var /= count;
-    var -= mean * mean;
+    //var -= mean * mean;
 
-    std::cout << d_mean << " " << count << " ** " << mean << " " << std::sqrt(var) << " " << max << " ** " << und_mean << " " << std::sqrt(und_var) << " " << und_max << std::endl;
+    data_map[d_mean].push_back(mean);
+    data_map[d_mean].push_back(std::sqrt(var));
+    data_map[d_mean].push_back(max);
+    data_map[d_mean].push_back(und_mean);
+    data_map[d_mean].push_back(std::sqrt(und_var));
+    data_map[d_mean].push_back(und_max);
+    data_map[d_mean].push_back(count);
+
   }
 
+  std::stringstream ss;
+  ss << "/home/filippo/Desktop/test/"
+     << color_sensor_->cameraModel()->tfFrame() << "_"
+     << MathTraits<LocalPolynomial>::MinDegree << "-" << MathTraits<LocalPolynomial>::Degree << "_"
+     << local_matrix_->model()->binSize().x() << "x" << local_matrix_->model()->binSize().y() << ".txt";
+
+  std::ofstream fs(ss.str().c_str());
+
+  fs << "avg_distance orig_error_avg orig_error_std_dev orig_error_max und_error_avg und_error_std_dev und_error_max" << std::endl;
+
+  for (std::map<Scalar, std::vector<Scalar> >::const_iterator it = data_map.begin(); it != data_map.end(); ++it)
+    fs << it->first << " "
+       << it->second[0] << " " << it->second[1] << " " << it->second[2] << " "
+       << it->second[3] << " " << it->second[4] << " " << it->second[5] << " "
+       << static_cast<int>(it->second[6]) << std::endl;
+
+  fs.close();
 }
 
 class NormalError
@@ -497,9 +636,10 @@ void CalibrationTest::testCheckerboardError() const
     Transform rot_matrix = q.matrix() * Transform::Identity();
 
     Checkerboard cb(*cb_views.checkerboard());
-    cb.transform(color_sensor_->pose() * rot_matrix * checkerboard_pose_eigen);
-
-    std::cout << cb.plane().coeffs().transpose() << ": " << cb.plane().normal().dot(cb.corners().container().rowwise().mean()) << std::endl;
+    cb.transform(rot_matrix * checkerboard_pose_eigen);
+    //std::cout << cb.plane().normal().dot(cb.corners().container().rowwise().mean()) << std::endl;
+    cb.transform(color_sensor_->pose());
+    std::cout << cb.plane().normal().transpose() << ": " << cb.plane().normal().dot(cb.corners().container().rowwise().mean()) << std::endl;
 
 //    AngleAxis rotation;
 //    rotation.angle() = data.row(i).head<3>().norm();
@@ -518,10 +658,12 @@ void CalibrationTest::testCheckerboardError() const
     Plane plane = plane_vec[i]; //cb_views.colorCheckerboard()->plane();
     //plane.transform(color_sensor_->pose());
 
-    const Cloud3 & und_points = PCLConversion<Scalar>::toPointMatrix(*und_data->depthData()/*, *cb_views.planeInliers()*/);
+    const Cloud3 & und_points = PCLConversion<Scalar>::toPointMatrix(*und_data->depthData(), *cb_views.planeInliers());
+    PCLCloud3::Ptr tmp_und_cloud = boost::make_shared<PCLCloud3>(und_points.size().x(), und_points.size().y());
 
     Point3 und_d_mean(0.0, 0.0, 0.0);
     Scalar und_mean = 0;
+    Scalar und_mean_abs = 0;
     Scalar und_mean2 = 0;
     int count = 0;
     for (int p = 0; p < und_points.elements(); ++p)
@@ -531,16 +673,22 @@ void CalibrationTest::testCheckerboardError() const
       und_d_mean += und_points[p];
       Scalar d = plane.signedDistance(und_points[p]);
       und_mean += d;
+      und_mean_abs += std::abs(d);
       und_mean2 += d * d;
       ++count;
+      tmp_und_cloud->points[p].x = und_points[p].x();
+      tmp_und_cloud->points[p].y = und_points[p].y();
+      tmp_und_cloud->points[p].z = d;
     }
 
     und_d_mean /= count;
     und_mean /= count;
+    und_mean_abs /= count;
     und_mean2 /= count;
     Scalar und_std_dev = std::sqrt(und_mean2 - und_mean * und_mean);
 
-    const Cloud3 points = PCLConversion<Scalar>::toPointMatrix(*data->depthData()/*, *cb_views.planeInliers()*/);
+    const Cloud3 points = PCLConversion<Scalar>::toPointMatrix(*data->depthData(), *cb_views.planeInliers());
+    PCLCloud3::Ptr tmp_cloud = boost::make_shared<PCLCloud3>(points.size().x(), points.size().y());
 
     Point3 d_mean(0.0, 0.0, 0.0);
     Scalar mean = 0;
@@ -553,6 +701,9 @@ void CalibrationTest::testCheckerboardError() const
       Scalar d = plane.signedDistance(points[p]);
       mean += d;
       mean2 += d * d;
+      tmp_cloud->points[p].x = points[p].x();
+      tmp_cloud->points[p].y = points[p].y();
+      tmp_cloud->points[p].z = d;
     }
 
     d_mean /= count;
@@ -560,7 +711,7 @@ void CalibrationTest::testCheckerboardError() const
     mean2 /= count;
     Scalar std_dev = std::sqrt(mean2 - mean * mean);
 
-    const Cloud3 part_points = PCLConversion<Scalar>::toPointMatrix(*part_und_data->depthData()/*, *cb_views.planeInliers()*/);
+    const Cloud3 part_points = PCLConversion<Scalar>::toPointMatrix(*part_und_data->depthData(), *cb_views.planeInliers());
 
     Scalar part_mean = 0;
     for (int p = 0; p < part_points.elements(); ++p)
@@ -583,7 +734,35 @@ void CalibrationTest::testCheckerboardError() const
     if (angle > M_PI_2)
       angle = M_PI - angle;
 
-    std::cout << plane.normal().dot(d_mean) << ": " << mean << ", " << std_dev << ", " << angle << "; " << plane.normal().dot(und_d_mean) << ": "<< und_mean << ", " << und_std_dev << ", " << und_angle << "; " << part_mean << std::endl;
+    std::cout << plane.normal().dot(d_mean) << ": " << mean << ", " << std_dev << ", " << angle << "; " << plane.normal().dot(und_d_mean) << ": "<< und_mean << ", " << und_std_dev << ", " << und_mean_abs << ", " << und_angle << "; " << part_mean << std::endl;
+
+
+
+
+    pcl::VoxelGrid<pcl::PointXYZ> voxel;
+    voxel.setInputCloud(tmp_cloud);
+    voxel.setLeafSize(0.04f, 10.0f, 0.03f);
+    voxel.filter(*tmp_cloud);
+
+    std::fstream fs;
+    std::stringstream ss;
+    ss << "/tmp/points_" << i << ".txt";
+    fs.open(ss.str().c_str(), std::fstream::out);
+    for (size_t j = 0; j < tmp_cloud->size(); ++j)
+      fs << tmp_cloud->points[j].x << " " << tmp_cloud->points[j].z << std::endl;
+    fs.close();
+
+    voxel.setInputCloud(tmp_und_cloud);
+    voxel.filter(*tmp_und_cloud);
+
+    ss.str("");
+    ss << "/tmp/und_points_" << i << ".txt";
+    fs.open(ss.str().c_str(), std::fstream::out);
+    for (size_t j = 0; j < tmp_und_cloud->size(); ++j)
+      fs << tmp_und_cloud->points[j].x << " " << tmp_und_cloud->points[j].z << std::endl;
+    fs.close();
+
+
 
 
 

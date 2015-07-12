@@ -86,8 +86,8 @@ TestNode::TestNode(ros::NodeHandle & node_handle)
   int images_size_x, images_size_y;
   node_handle_.param("depth_image/cols", images_size_x, 640);
   node_handle_.param("depth_image/rows", images_size_y, 480);
-  images_size_.x() = images_size_x;
-  images_size_.y() = images_size_y;
+  images_size_.x() = images_size_x / downsample_ratio_;
+  images_size_.y() = images_size_y / downsample_ratio_;
 
   std::string depth_type_s;
   node_handle_.param("depth_type", depth_type_s, std::string("none"));
@@ -222,10 +222,10 @@ void TestNode::spin()
   for (int i = starting_index_; ros::ok() and i < starting_index_ + instances_; ++i)
   {
     std::stringstream image_file;
-    image_file << path_ << image_filename_ << i << "." << image_extension_;
+    image_file << path_ << image_filename_ << (i < 10 ? "000" : "00") << i << "." << image_extension_;
 
     std::stringstream cloud_file;
-    cloud_file << path_ << cloud_filename_ << i << ".pcd";
+    cloud_file << path_ << cloud_filename_ << (i < 10 ? "000" : "00") << i << ".pcd";
 
     cv::Mat image = cv::imread(image_file.str());
 
@@ -273,12 +273,10 @@ void TestNode::spin()
 
     //rate.sleep();
   }
-
-  test_->visualizeClouds();
-
   ROS_INFO_STREAM("Added " << added << " images + point clouds.");
   if (not only_show_)
   {
+    test_->visualizeClouds();
     test_->testPlanarityError();
     test_->testCheckerboardError();
   }

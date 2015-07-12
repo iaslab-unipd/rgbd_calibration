@@ -42,12 +42,14 @@
             translation: {x: 0.0, y: 0.0, z: 0.0}
             rotation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
             
-          depth_error_function: [0.0, 0.0, 0.0035]
+          depth_error_function: [0.0017, -0.0010, 0.0016]
           
           undistortion_matrix:
             cell_size_x: 2
             cell_size_y: 2
         </rosparam>
+        <!-- 47A depth_error_function: [0.0019, -0.0016, 0.0020] -->
+        <!-- 51A depth_error_function: [0.0022, 0.00088, 0.0033] -->
         
         <param name="downsample_ratio" value="$(arg downsample_ratio)" />
         
