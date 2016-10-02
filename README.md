@@ -1,3 +1,7 @@
+## Dependencies
+
+This package depends on [calibration_toolkit](https://github.com/iaslab-unipd/calibration_toolkit) version 0.3 (i.e. `git checkout v0.3`).
+
 ## Initial Setup
 
 Edit **conf/checkerboards.yaml** to match your checkerboard(s) parameters.
