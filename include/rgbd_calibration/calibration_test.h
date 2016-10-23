@@ -19,11 +19,15 @@
 #define RGBD_CALIBRATION_CALIBRATION_TEST_H_
 
 #include <calibration_common/pinhole/sensor.h>
-#include <calibration_common/depth/sensor.h>
+#include <kinect/depth/sensor.h>
 
 #include <rgbd_calibration/globals.h>
 #include <rgbd_calibration/publisher.h>
 #include <rgbd_calibration/checkerboard_views.h>
+
+//#define HERRERA
+//#define UNCALIBRATED
+//#define SKEW
 
 namespace calibration
 {
@@ -40,7 +44,7 @@ public:
     color_sensor_ = color_sensor;
   }
 
-  void setDepthSensor(const DepthSensor::Ptr & depth_sensor)
+  void setDepthSensor(const KinectDepthSensorBase::Ptr & depth_sensor)
   {
     depth_sensor_ = depth_sensor;
   }
@@ -61,8 +65,8 @@ public:
     ratio_ = ratio;
   }
 
-  void addData(const cv::Mat & image,
-               const PCLCloud3::ConstPtr & cloud);
+  PCLCloudRGB::Ptr addData(const cv::Mat & image,
+                           const PCLCloud3::ConstPtr & cloud);
 
   void setLocalModel(const LocalModel::Ptr & model)
   {
@@ -82,10 +86,16 @@ public:
 
   void testCheckerboardError() const;
 
+  void testCube() const;
+
 protected:
 
+  boost::shared_ptr<std::vector<int> >
+  extractPlaneFromCloud (const PCLCloud3::Ptr & cloud,
+                         const Cloud2 & depth_corners) const;
+
   PinholeSensor::Ptr color_sensor_;
-  DepthSensor::Ptr depth_sensor_;
+  KinectDepthSensorBase::Ptr depth_sensor_;
 
   std::vector<Checkerboard::ConstPtr> cb_vec_;
 
@@ -95,6 +105,8 @@ protected:
 
   LocalMatrixPCL::Ptr local_matrix_;
   GlobalMatrixPCL::Ptr global_matrix_;
+
+public:
 
   std::vector<RGBDData::ConstPtr> data_vec_;
   std::vector<RGBDData::ConstPtr> part_und_data_vec_;

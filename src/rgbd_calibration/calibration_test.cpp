@@ -18,12 +18,18 @@
 #include <rgbd_calibration/calibration_test.h>
 #include <rgbd_calibration/checkerboard_views_extractor.h>
 
+#include <calibration_common/ceres/plane_fit.h>
+
+#include <calibration_common/algorithms/automatic_checkerboard_finder.h>
+#include <calibration_common/algorithms/interactive_checkerboard_finder.h>
 #include <calibration_common/base/pcl_conversion.h>
 #include <kinect/depth/polynomial_matrix_io.h>
 
+#include <pcl/filters/statistical_outlier_removal.h>
 #include <pcl/filters/random_sample.h>
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/filters/passthrough.h>
+#include <pcl/filters/extract_indices.h>
 
 #include <pcl/io/pcd_io.h>
 
@@ -51,8 +57,8 @@ void CalibrationTest::publishData() const
 
 }
 
-void CalibrationTest::addData(const cv::Mat & image,
-                              const PCLCloud3::ConstPtr & cloud)
+PCLCloudRGB::Ptr CalibrationTest::addData(const cv::Mat & image,
+                                          const PCLCloud3::ConstPtr & cloud)
 {
 //  PCLCloud3::Ptr new_cloud = boost::make_shared<PCLCloud3>();
 //  std::vector<int> remapping;
@@ -110,11 +116,17 @@ void CalibrationTest::addData(const cv::Mat & image,
 
   int index = data_vec_.size() + 1;
 
-  cv::Mat rectified;
+  cv::Mat rectified = image;
   color_sensor_->cameraModel()->rectifyImage(image, rectified);
 
+  PinholeSensor::Ptr color_sensor_original = boost::make_shared<PinholeSensor>();
+  color_sensor_original->setFrameId("/pinhole_sensor_original");
+  color_sensor_original->setCameraModel(color_sensor_->cameraModel());
+  color_sensor_original->setParent(depth_sensor_);
+  color_sensor_original->transform(Transform::Identity() * Translation3(0.052, 0.0, 0.0));
+
   RGBDData::Ptr data(boost::make_shared<RGBDData>(index));
-  data->setColorSensor(color_sensor_);
+  data->setColorSensor(color_sensor_original);
   data->setDepthSensor(depth_sensor_);
   data->setColorData(rectified);
   data->setDepthData(*new_cloud);
@@ -143,6 +155,9 @@ void CalibrationTest::addData(const cv::Mat & image,
 
   part_data_map_[und_data] = part_und_data;
   data_map_[und_data] = data;
+
+  und_data->fuseData();
+  return und_data->fusedData();
 
 
   //  float z = 0.0f;
@@ -244,30 +259,102 @@ void CalibrationTest::visualizeClouds() const
   int ORIGINAL = 0, UNDISTORTED = 1, FINAL = 2;
 
   pcl::visualization::PCLVisualizer viz("Test Set Visualization");
-//  viz.createViewPort(0.0, 0.0, 0.33, 1.0, ORIGINAL);
-//  viz.createViewPort(0.33, 0.0, 0.67, 1.0, UNDISTORTED);
-//  viz.createViewPort(0.67, 0.0, 1.0, 1.0, FINAL);
+  viz.createViewPort(0.0, 0.0, 0.33, 1.0, ORIGINAL);
+  viz.createViewPort(0.33, 0.0, 0.67, 1.0, UNDISTORTED);
+  viz.createViewPort(0.67, 0.0, 1.0, 1.0, FINAL);
 
-  viz.createViewPort(0.0, 0.0, 0.5, 1.0, ORIGINAL);
-  viz.createViewPort(0.5, 0.0, 1.0, 1.0, FINAL);
-  viz.addCoordinateSystem();
+//  viz.createViewPort(0.0, 0.0, 0.5, 1.0, ORIGINAL);
+//  viz.createViewPort(0.5, 0.0, 1.0, 1.0, FINAL);
+  viz.addCoordinateSystem(0.5);
 
-  std::vector<double> plane_distances(12);
-  plane_distances[0] = 1.00134;
-  plane_distances[1] = 1.20495;
-  plane_distances[2] = 1.53675;
-  plane_distances[3] = 1.86759;
-  plane_distances[4] = 2.21074;
-  plane_distances[5] = 2.54476;
-  plane_distances[6] = 2.89025;
-  plane_distances[7] = 3.23017;
-  plane_distances[8] = 3.56103;
-  plane_distances[9] = 3.89967;
-  plane_distances[10] = 4.21813;
-  plane_distances[11] = 4.57653;
+//  std::vector<double> plane_distances(12);
+//  plane_distances[0] = 1.00134;
+//  plane_distances[1] = 1.20495;
+//  plane_distances[2] = 1.53675;
+//  plane_distances[3] = 1.86759;
+//  plane_distances[4] = 2.21074;
+//  plane_distances[5] = 2.54476;
+//  plane_distances[6] = 2.89025;
+//  plane_distances[7] = 3.23017;
+//  plane_distances[8] = 3.56103;
+//  plane_distances[9] = 3.89967;
+//  plane_distances[10] = 4.21813;
+//  plane_distances[11] = 4.57653;
 
-  for (size_t index = 1; index < data_vec_.size(); index += 4)
+  std::vector<double> plane_distances;
+//   plane_distances.push_back(0.943);
+//  plane_distances.push_back(1.099);
+//  plane_distances.push_back(1.241);
+//  plane_distances.push_back(1.413);
+//  plane_distances.push_back(1.615);
+//  plane_distances.push_back(1.768);
+//  plane_distances.push_back(1.935);
+//   plane_distances.push_back(2.097);
+//  plane_distances.push_back(2.261);
+//  plane_distances.push_back(2.423);
+//  plane_distances.push_back(2.595);
+//  plane_distances.push_back(2.76);
+//  plane_distances.push_back(2.906);
+//   plane_distances.push_back(3.07);
+//  plane_distances.push_back(3.292);
+//  plane_distances.push_back(3.452);
+//  plane_distances.push_back(3.612);
+//  plane_distances.push_back(3.782);
+//   plane_distances.push_back(4.079);
+//  plane_distances.push_back(4.278);
+//  plane_distances.push_back(4.455);
+//  plane_distances.push_back(4.635);
+
+   plane_distances.push_back(0.962);
+  plane_distances.push_back(1.133);
+  plane_distances.push_back(1.305);
+  plane_distances.push_back(1.476);
+  plane_distances.push_back(1.666);
+  plane_distances.push_back(1.808);
+   plane_distances.push_back(1.998);
+  plane_distances.push_back(2.148);
+  plane_distances.push_back(2.339);
+  plane_distances.push_back(2.467);
+  plane_distances.push_back(2.619);
+  plane_distances.push_back(2.819);
+   plane_distances.push_back(3.013);
+  plane_distances.push_back(3.178);
+  plane_distances.push_back(3.323);
+  plane_distances.push_back(3.497);
+  plane_distances.push_back(3.672);
+  plane_distances.push_back(3.855);
+   plane_distances.push_back(4.02);
+  plane_distances.push_back(4.175);
+  plane_distances.push_back(4.338);
+  plane_distances.push_back(4.508);
+  size_t indices[] = {0, 6, 12, 18};
+
+//   plane_distances.push_back(0.927);
+//  plane_distances.push_back(1.106);
+//  plane_distances.push_back(1.331);
+//  plane_distances.push_back(1.507);
+//  plane_distances.push_back(1.661);
+//  plane_distances.push_back(1.855);
+//   plane_distances.push_back(2.012);
+//  plane_distances.push_back(2.258);
+//  plane_distances.push_back(2.457);
+//  plane_distances.push_back(2.675);
+//  plane_distances.push_back(2.817);
+//   plane_distances.push_back(3.015);
+//  plane_distances.push_back(3.179);
+//  plane_distances.push_back(5);
+//  plane_distances.push_back(3.531);
+//  plane_distances.push_back(3.705);
+//  plane_distances.push_back(3.862);
+//   plane_distances.push_back(3.99);
+//  plane_distances.push_back(5);
+//  plane_distances.push_back(4.411);
+//  size_t indices[] = {0, 6, 11, 17};
+
+  for (size_t index_i = 0; index_i < 4; ++index_i)
   {
+    size_t index = indices[index_i];
+
     std::stringstream ss;
     ss << "cloud_" << index;
     const RGBDData::ConstPtr & data = data_vec_[index];
@@ -297,17 +384,41 @@ void CalibrationTest::visualizeClouds() const
     typedef pcl::visualization::PointCloudColorHandlerGenericField<PCLPoint3> ColorHandler;
 
     viz.addPointCloud(data->depthData(), ColorHandler(data->depthData(), "y"), ss.str(), ORIGINAL);
-    //viz.addPointCloud(part_und_data->depthData(), ColorHandler(part_und_data->depthData(), "y"), ss.str() + "_und", UNDISTORTED);
+    viz.addPointCloud(part_und_data->depthData(), ColorHandler(part_und_data->depthData(), "y"), ss.str() + "_und", UNDISTORTED);
     viz.addPointCloud(und_data->depthData(), ColorHandler(und_data->depthData(), "y"), ss.str() + "_final", FINAL);
-    viz.setCameraPosition(0, -20, 4.38, 0.344644, 0.313943, 2.74408, 0.000739467, 0.0778838, 0.996962);
-    viz.setCameraFieldOfView(30 * M_PI / 180);
-    viz.setCameraClipDistances(16.8601, 25.7878);
-    viz.setPosition(65, 24);
-    viz.setSize(1855, 1056);
+
+    ss.str("");
+    ss << index;
+    PCLPoint3 p1, p2;
+//    p1.x = -5; p1.y = 0; p1.z = plane_distances[index];
+//    p2.x =  5; p2.y = 0; p2.z = plane_distances[index];
+    p1.y = -5; p1.x = 0; p1.z = plane_distances[index];
+    p2.y =  5; p2.x = 0; p2.z = plane_distances[index];
+    viz.addLine(p1, p2, 0, 0, 0, ss.str() + "_o", ORIGINAL);
+    viz.addLine(p1, p2, 0, 0, 0, ss.str() + "_u", UNDISTORTED);
+    viz.addLine(p1, p2, 0, 0, 0, ss.str() + "_f", FINAL);
 
   }
 
-  for (int j = 1; j <= 5; j += 2)
+//  viz.setCameraPosition(0.11384, -13.6088, 2.64823, 0.118126, 0.312233, 2.76886, 0.0, 0.0, 1.0);
+//  viz.setCameraClipDistances(9.85203, 18.1708);
+  viz.setCameraPosition(24.3543, 0.377151, 2.79902, 0.118126, 0.312233, 2.76886, 0.0, 1.0, 0.0);
+  viz.setCameraClipDistances(19.2645, 30.751);
+  viz.setCameraFieldOfView(30 * M_PI / 180);
+  viz.setPosition(0, 24);
+  viz.setSize(1920, 1056);
+
+
+  PCLPoint3 p1, p2;
+//  p1.x = -5; p1.y = 0; p1.z = 5;
+//  p2.x =  5; p2.y = 0; p2.z = 5;
+  p1.y = -5; p1.x = 0; p1.z = 5;
+  p2.y =  5; p2.x = 0; p2.z = 5;
+  viz.addLine(p1, p2, 0, 0, 0, "5_o", ORIGINAL);
+  viz.addLine(p1, p2, 0, 0, 0, "5_u", UNDISTORTED);
+  viz.addLine(p1, p2, 0, 0, 0, "5_f", FINAL);
+
+  /*for (int j = 1; j <= 5; j += 2)
   {
     std::stringstream ss;
     ss << j << "m";
@@ -315,13 +426,13 @@ void CalibrationTest::visualizeClouds() const
     p1.x = -5; p1.y = 0; p1.z = j;
     p2.x =  5; p2.y = 0; p2.z = j;
     viz.addLine(p1, p2, 0, 0, 0, ss.str() + "_o", ORIGINAL);
-    //viz.addLine(p1, p2, 0, 0, 0, ss.str() + "_u", UNDISTORTED);
+    viz.addLine(p1, p2, 0, 0, 0, ss.str() + "_u", UNDISTORTED);
     viz.addLine(p1, p2, 0, 0, 0, ss.str() + "_f", FINAL);
-  }
+  }*/
 
 //  viz.setBackgroundColor(0.08, 0.08, 0.08, UNDISTORTED);
   viz.setBackgroundColor(1.0, 1.0, 1.0, ORIGINAL);
-  //viz.setBackgroundColor(1.0, 1.0, 1.0, UNDISTORTED);
+  viz.setBackgroundColor(1.0, 1.0, 1.0, UNDISTORTED);
   viz.setBackgroundColor(1.0, 1.0, 1.0, FINAL);
 
   std::stringstream ss;
@@ -501,23 +612,23 @@ void CalibrationTest::testPlanarityError() const
 
   }
 
-  std::stringstream ss;
-  ss << "/home/filippo/Desktop/test/"
-     << color_sensor_->cameraModel()->tfFrame() << "_"
-     << MathTraits<LocalPolynomial>::MinDegree << "-" << MathTraits<LocalPolynomial>::Degree << "_"
-     << local_matrix_->model()->binSize().x() << "x" << local_matrix_->model()->binSize().y() << ".txt";
+//  std::stringstream ss;
+//  ss << "/home/filippo/Desktop/test/"
+//     << color_sensor_->cameraModel()->tfFrame() << "_"
+//     << MathTraits<LocalPolynomial>::MinDegree << "-" << MathTraits<LocalPolynomial>::Degree << "_"
+//     << local_matrix_->model()->binSize().x() << "x" << local_matrix_->model()->binSize().y() << ".txt";
 
-  std::ofstream fs(ss.str().c_str());
+//  std::ofstream fs(ss.str().c_str());
 
-  fs << "avg_distance orig_error_avg orig_error_std_dev orig_error_max und_error_avg und_error_std_dev und_error_max" << std::endl;
+  std::cout << "avg_distance orig_error_avg orig_error_std_dev orig_error_max und_error_avg und_error_std_dev und_error_max" << std::endl;
 
   for (std::map<Scalar, std::vector<Scalar> >::const_iterator it = data_map.begin(); it != data_map.end(); ++it)
-    fs << it->first << " "
+    std::cout << it->first << " "
        << it->second[0] << " " << it->second[1] << " " << it->second[2] << " "
        << it->second[3] << " " << it->second[4] << " " << it->second[5] << " "
        << static_cast<int>(it->second[6]) << std::endl;
 
-  fs.close();
+//  fs.close();
 }
 
 class NormalError
@@ -637,9 +748,9 @@ void CalibrationTest::testCheckerboardError() const
 
     Checkerboard cb(*cb_views.checkerboard());
     cb.transform(rot_matrix * checkerboard_pose_eigen);
-    //std::cout << cb.plane().normal().dot(cb.corners().container().rowwise().mean()) << std::endl;
+    std::cout << cb.plane().normal().dot(cb.corners().container().rowwise().mean()) << std::endl;
     cb.transform(color_sensor_->pose());
-    std::cout << cb.plane().normal().transpose() << ": " << cb.plane().normal().dot(cb.corners().container().rowwise().mean()) << std::endl;
+    //std::cout << cb.plane().normal().transpose() << ": " << cb.plane().normal().dot(cb.corners().container().rowwise().mean()) << std::endl;
 
 //    AngleAxis rotation;
 //    rotation.angle() = data.row(i).head<3>().norm();
@@ -648,6 +759,11 @@ void CalibrationTest::testCheckerboardError() const
 //    cb.transform(translation * rotation);
     plane_vec.push_back(cb.plane());
   }
+
+  Vector3 n_z = plane_vec[0].normal();
+  Vector3 n_x = (Vector3::UnitX() - Vector3::UnitX().dot(n_z) * n_z).normalized();
+  Vector3 n_y = n_z.cross(n_x);
+
 
   for (size_t i = 0; i < cb_views_vec.size(); ++i)
   {
@@ -661,11 +777,24 @@ void CalibrationTest::testCheckerboardError() const
     const Cloud3 & und_points = PCLConversion<Scalar>::toPointMatrix(*und_data->depthData(), *cb_views.planeInliers());
     PCLCloud3::Ptr tmp_und_cloud = boost::make_shared<PCLCloud3>(und_points.size().x(), und_points.size().y());
 
+//    PointPlaneExtraction<PCLPoint3> plane_extractor;
+//    plane_extractor.setInputCloud(und_data->depthData());
+//    const pcl::PointCloud<pcl::Normal>::ConstPtr und_normals_pcl = plane_extractor.cloudNormals();
+//    Cloud3 und_normals(Size2(cb_views.planeInliers()->size(), 1));
+//    for (Size1 j = 0; j < cb_views.planeInliers()->size(); ++j)
+//    {
+//      const pcl::Normal & p = und_normals_pcl->points[(*cb_views.planeInliers())[j]];
+//      und_normals[j] << p.normal_x, p.normal_y, p.normal_z;
+//    }
+
+
     Point3 und_d_mean(0.0, 0.0, 0.0);
     Scalar und_mean = 0;
     Scalar und_mean_abs = 0;
     Scalar und_mean2 = 0;
-    int count = 0;
+//    Vector3 und_angle_mean = Vector3::Zero();
+//    Vector3 und_angle_mean2 = Vector3::Zero();
+    int count = 0, angle_count = 0;
     for (int p = 0; p < und_points.elements(); ++p)
     {
       if (not und_points[p].allFinite())
@@ -679,20 +808,54 @@ void CalibrationTest::testCheckerboardError() const
       tmp_und_cloud->points[p].x = und_points[p].x();
       tmp_und_cloud->points[p].y = und_points[p].y();
       tmp_und_cloud->points[p].z = d;
+
+//      if (not und_normals[p].allFinite())
+//        continue;
+//      Scalar a = std::acos(und_normals[p].normalized().dot(n_z));
+//      if (a > M_PI_2)
+//        a = M_PI - a;
+//      und_angle_mean[2] += a;
+//      und_angle_mean2[2] += a * a;
+
+//      a = std::acos(und_normals[p].normalized().dot(n_x));
+//      und_angle_mean[0] += a;
+//      und_angle_mean2[0] += a * a;
+
+//      a = std::acos(und_normals[p].normalized().dot(n_y));
+//      und_angle_mean[1] += a;
+//      und_angle_mean2[1] += a * a;
+
+//      ++angle_count;
     }
 
     und_d_mean /= count;
     und_mean /= count;
     und_mean_abs /= count;
     und_mean2 /= count;
+//    und_angle_mean /= angle_count;
+//    und_angle_mean2 /= angle_count;
+
     Scalar und_std_dev = std::sqrt(und_mean2 - und_mean * und_mean);
+//    Vector3 und_angle_std_dev = (und_angle_mean2 - und_angle_mean.cwiseAbs2()).cwiseSqrt();
 
     const Cloud3 points = PCLConversion<Scalar>::toPointMatrix(*data->depthData(), *cb_views.planeInliers());
     PCLCloud3::Ptr tmp_cloud = boost::make_shared<PCLCloud3>(points.size().x(), points.size().y());
 
+//    plane_extractor.setInputCloud(data->depthData());
+//    const pcl::PointCloud<pcl::Normal>::ConstPtr normals_pcl = plane_extractor.cloudNormals();
+//    Cloud3 normals(Size2(cb_views.planeInliers()->size(), 1));
+//    for (Size1 j = 0; j < cb_views.planeInliers()->size(); ++j)
+//    {
+//      const pcl::Normal & p = normals_pcl->points[(*cb_views.planeInliers())[j]];
+//      normals[j] << p.normal_x, p.normal_y, p.normal_z;
+//    }
+
     Point3 d_mean(0.0, 0.0, 0.0);
     Scalar mean = 0;
     Scalar mean2 = 0;
+//    Vector3 angle_mean = Vector3::Zero();
+//    Vector3 angle_mean2 = Vector3::Zero();
+//    angle_count = 0;
     for (Size1 p = 0; p < points.elements(); ++p)
     {
       if (not points[p].allFinite())
@@ -704,38 +867,80 @@ void CalibrationTest::testCheckerboardError() const
       tmp_cloud->points[p].x = points[p].x();
       tmp_cloud->points[p].y = points[p].y();
       tmp_cloud->points[p].z = d;
+
+//      if (not und_normals[p].allFinite())
+//        continue;
+//      Scalar a = std::acos(normals[p].normalized().dot(n_z));
+//      if (a > M_PI_2)
+//        a = M_PI - a;
+//      angle_mean[2] += a;
+//      angle_mean2[2] += a * a;
+
+//      a = std::acos(normals[p].normalized().dot(n_x));
+//      angle_mean[0] += a;
+//      angle_mean2[0] += a * a;
+
+//      a = std::acos(normals[p].normalized().dot(n_y));
+//      angle_mean[1] += a;
+//      angle_mean2[1] += a * a;
+
+//      ++angle_count;
+
     }
 
     d_mean /= count;
     mean /= count;
     mean2 /= count;
+//    angle_mean /= angle_count;
+//    angle_mean2 /= angle_count;
+
     Scalar std_dev = std::sqrt(mean2 - mean * mean);
+//    Vector3 angle_std_dev = (angle_mean2 - angle_mean.cwiseAbs2()).cwiseSqrt();
 
     const Cloud3 part_points = PCLConversion<Scalar>::toPointMatrix(*part_und_data->depthData(), *cb_views.planeInliers());
 
+    Point3 part_d_mean(0.0, 0.0, 0.0);
     Scalar part_mean = 0;
+    Scalar part_mean2 = 0;
     for (int p = 0; p < part_points.elements(); ++p)
     {
       if (not part_points[p].allFinite())
         continue;
+      part_d_mean += part_points[p];
       Scalar d = plane.signedDistance(part_points[p]);
       part_mean += d;
+      part_mean2 += d * d;
     }
 
+    part_d_mean /= count;
     part_mean /= count;
+    part_mean2 /= count;
+    Scalar part_std_dev = std::sqrt(part_mean2 - part_mean * part_mean);
 
     Plane und_fitted_plane = PlaneFit<Scalar>::fit(und_points);
-    Scalar und_angle = std::acos(und_fitted_plane.normal().dot(plane.normal()));
-    if (und_angle > M_PI_2)
-      und_angle = M_PI - und_angle;
+    if (und_fitted_plane.offset() < 0)
+      und_fitted_plane.coeffs() *= -1.0;
+    Scalar und_angle_x = std::acos(und_fitted_plane.normal().dot(n_x));
+    Scalar und_angle_y = std::acos(und_fitted_plane.normal().dot(n_y));
 
     Plane fitted_plane = PlaneFit<Scalar>::fit(points);
-    Scalar angle = std::acos(fitted_plane.normal().dot(plane.normal()));
-    if (angle > M_PI_2)
-      angle = M_PI - angle;
+    if (fitted_plane.offset() < 0)
+      fitted_plane.coeffs() *= -1.0;
+    Scalar angle_x = std::acos(fitted_plane.normal().dot(n_x));
+    Scalar angle_y = std::acos(fitted_plane.normal().dot(n_y));
 
-    std::cout << plane.normal().dot(d_mean) << ": " << mean << ", " << std_dev << ", " << angle << "; " << plane.normal().dot(und_d_mean) << ": "<< und_mean << ", " << und_std_dev << ", " << und_mean_abs << ", " << und_angle << "; " << part_mean << std::endl;
+    Plane part_fitted_plane = PlaneFit<Scalar>::fit(part_points);
+    if (part_fitted_plane.offset() < 0)
+      part_fitted_plane.coeffs() *= -1.0;
+    Scalar part_angle_x = std::acos(part_fitted_plane.normal().dot(n_x));
+    Scalar part_angle_y = std::acos(part_fitted_plane.normal().dot(n_y));
 
+    std::cout << "Original: " << plane.normal().dot(d_mean) << ", " << mean << ", " << std_dev << ", "
+              << 180 * angle_x / M_PI << ", " << 180 * angle_y / M_PI << "; "
+              << "Final: " << plane.normal().dot(und_d_mean) << ", "<< und_mean << ", " << und_std_dev << ", "
+              << 180 * und_angle_x / M_PI << ", " << 180 * und_angle_y / M_PI << "; "
+              << "Undistorted: " << plane.normal().dot(part_d_mean) << ", "<< part_mean << ", " << part_std_dev << ", "
+              << 180 * part_angle_x / M_PI << ", " << 180 * part_angle_y / M_PI << "; " << std::endl;
 
 
 
@@ -767,6 +972,396 @@ void CalibrationTest::testCheckerboardError() const
 
 
   }
+
+}
+
+boost::shared_ptr<std::vector<int> >
+CalibrationTest::extractPlaneFromCloud (const PCLCloud3::Ptr & cloud,
+                                        const Cloud2 & depth_corners) const
+{
+  float min_x = depth_corners[0].x();
+  float max_x = min_x;
+  float min_y = depth_corners[0].y();
+  float max_y = min_y;
+  for (int i = 1; i < 4; ++i)
+  {
+    min_x = std::min<float>(min_x, depth_corners[i].x());
+    max_x = std::max<float>(max_x, depth_corners[i].x());
+    min_y = std::min<float>(min_y, depth_corners[i].y());
+    max_y = std::max<float>(max_y, depth_corners[i].y());
+  }
+
+  min_x = std::max(min_x, 0.0f);
+  max_x = std::min(max_x, static_cast<float>(cloud->width));
+  min_y = std::max(min_y, 0.0f);
+  max_y = std::min(max_y, static_cast<float>(cloud->height));
+
+  Vector2 lines[4];
+
+  for (int i = 0; i < 4; ++i)
+    lines[i] = depth_corners[(i + 1) % 4] - depth_corners[i];
+
+  boost::shared_ptr<std::vector<int> > indices = boost::make_shared<std::vector<int> >();
+  indices->reserve(static_cast<size_t>((max_x - min_x) * (max_y - min_y)));
+
+  for (float y = std::ceil(min_y); y < max_y; ++y)
+  {
+    for (float x = std::ceil(min_x); x < max_x; ++x)
+    {
+      bool ok = true;
+
+      Vector2 vec = Vector2(x, y) - depth_corners[0];
+      int sign;
+      if (lines[0].x() * vec.y() - lines[0].y() * vec.x() >= 0)
+        sign = 1;
+      else
+        sign = -1;
+
+      for (int i = 1; i < 4; ++i)
+      {
+        Vector2 vec = Vector2(x, y) - depth_corners[i];
+        if (sign * (lines[i].x() * vec.y() - lines[i].y() * vec.x()) < 0)
+        {
+          ok = false;
+          break;
+        }
+      }
+      if (ok)
+        indices->push_back(static_cast<int>(y * cloud->width + x));
+    }
+  }
+
+  return indices;
+
+}
+
+
+void CalibrationTest::testCube() const
+{
+  Checkerboard checkerboard(4, 4, 0.095, 0.095);
+
+  std::vector<std::vector<double> > data_vec;
+
+  for (size_t i = 0; i < und_data_vec_.size(); ++i)
+  {
+#ifndef UNCALIBRATED
+    const RGBDData & data = *und_data_vec_.at(i);
+#else
+    const RGBDData & data = *data_vec_.at(i);
+#endif
+    cv::Mat tmp_image = data.colorData().clone();
+    cv::Mat tmp_image_rect;
+
+    cv::undistort(tmp_image, tmp_image_rect,
+                  color_sensor_->cameraModel()->intrinsicMatrix(),
+                  color_sensor_->cameraModel()->distortionCoeffs(),
+                  color_sensor_->cameraModel()->intrinsicMatrix());
+
+    //color_sensor_->cameraModel()->rectifyImage(tmp_image, tmp_image_rect);
+    AutomaticCheckerboardFinder finder;
+
+    std::vector<Plane, Eigen::aligned_allocator<Plane> > planes;
+    std::vector<Point3, Eigen::aligned_allocator<Point3> > points;
+    std::vector<Plane, Eigen::aligned_allocator<Plane> > depth_planes;
+    std::vector<Point3, Eigen::aligned_allocator<Point3> > depth_points;
+
+
+    //pcl::visualization::PCLVisualizer viz("VIZ");
+
+    for (int c = 0; c < 3; ++c)
+    {
+      finder.setImage(tmp_image);
+      Cloud2 corners;
+      bool found = finder.find(checkerboard, corners);
+
+      Pose pose = color_sensor_->estimatePose(corners, checkerboard.corners());
+      Checkerboard tmp_checkerboard(6, 6, 0.095, 0.095);
+      tmp_checkerboard.transform(pose * Translation3(-0.095, -0.095, 0.0));
+      Cloud2 tmp_corners = color_sensor_->cameraModel()->project3dToPixel(tmp_checkerboard.corners());
+
+      if (found)
+      {
+        cv::vector<cv::Point> points;
+        /*points.push_back(cv::Point(corners[0].x(), corners[0].y()));
+        points.push_back(cv::Point(corners[3].x(), corners[3].y()));
+        points.push_back(cv::Point(corners[15].x(), corners[15].y()));
+        points.push_back(cv::Point(corners[12].x(), corners[12].y()));*/
+
+        points.push_back(cv::Point(tmp_corners[0].x(), tmp_corners[0].y()));
+        points.push_back(cv::Point(tmp_corners[5].x(), tmp_corners[5].y()));
+        points.push_back(cv::Point(tmp_corners[35].x(), tmp_corners[35].y()));
+        points.push_back(cv::Point(tmp_corners[30].x(), tmp_corners[30].y()));
+
+        cv::fillConvexPoly(tmp_image, points, cv::Scalar(c == 0 ? 255 : 0, c == 1 ? 255 : 0, c == 2 ? 255 : 0));
+
+        for (int corner = 0; corner < tmp_corners.elements(); ++corner)
+          cv::circle(tmp_image_rect, cv::Point2f(tmp_corners[corner].x(), tmp_corners[corner].y()), 2, cv::Scalar(c == 0 ? 255 : 0, c == 1 ? 255 : 0, c == 2 ? 255 : 0));
+        //cv::fillConvexPoly(tmp_image_rect, points, cv::Scalar(c == 0 ? 255 : 0, c == 1 ? 255 : 0, c == 2 ? 255 : 0));
+      }
+      else
+      {
+        ROS_WARN("Pattern not found");
+        InteractiveCheckerboardFinder i_finder;
+        i_finder.setImage(tmp_image);
+
+        found = i_finder.find(checkerboard, corners, true);
+
+        Pose pose = color_sensor_->estimatePose(corners, checkerboard.corners());
+        tmp_checkerboard = Checkerboard(6, 6, 0.095, 0.095);
+        tmp_checkerboard.transform(pose * Translation3(-0.095, -0.095, 0.0));
+        Cloud2 tmp_corners = color_sensor_->cameraModel()->project3dToPixel(tmp_checkerboard.corners());
+
+        if (found)
+        {
+          cv::vector<cv::Point> points;
+
+          points.push_back(cv::Point(tmp_corners[0].x(), tmp_corners[0].y()));
+          points.push_back(cv::Point(tmp_corners[5].x(), tmp_corners[5].y()));
+          points.push_back(cv::Point(tmp_corners[35].x(), tmp_corners[35].y()));
+          points.push_back(cv::Point(tmp_corners[30].x(), tmp_corners[30].y()));
+
+          cv::fillConvexPoly(tmp_image, points, cv::Scalar(c == 0 ? 255 : 0, c == 1 ? 255 : 0, c == 2 ? 255 : 0));
+
+          for (int corner = 0; corner < tmp_corners.elements(); ++corner)
+            cv::circle(tmp_image_rect, cv::Point2f(tmp_corners[corner].x(), tmp_corners[corner].y()), 2, cv::Scalar(c == 0 ? 255 : 0, c == 1 ? 255 : 0, c == 2 ? 255 : 0));
+          //cv::fillConvexPoly(tmp_image_rect, points, cv::Scalar(c == 0 ? 255 : 0, c == 1 ? 255 : 0, c == 2 ? 255 : 0));
+        }
+      }
+
+      //cv::drawChessboardCorners(tmp_image, cv::Size(checkerboard.cols(), checkerboard.rows()), corners, found);
+
+      Cloud3 depth_corners(Size2(1, 4));
+      depth_corners(0, 0) = tmp_checkerboard(0, 0);
+      depth_corners(0, 1) = tmp_checkerboard(0, 5);
+      depth_corners(0, 2) = tmp_checkerboard(5, 5);
+      depth_corners(0, 3) = tmp_checkerboard(5, 0);
+      depth_corners.transform(color_sensor_->pose());
+
+//#ifdef HERRERA
+      std::vector<cv::Point3f> in(4);
+      in[0] = cv::Point3f(depth_corners(0, 0).x(), depth_corners(0, 0).y(), depth_corners(0, 0).z());
+      in[1] = cv::Point3f(depth_corners(0, 1).x(), depth_corners(0, 1).y(), depth_corners(0, 1).z());
+      in[2] = cv::Point3f(depth_corners(0, 2).x(), depth_corners(0, 2).y(), depth_corners(0, 2).z());
+      in[3] = cv::Point3f(depth_corners(0, 3).x(), depth_corners(0, 3).y(), depth_corners(0, 3).z());
+
+      std::vector<cv::Point2f> out;
+#ifdef HERRERA
+      cv::projectPoints(in, cv::Mat_<float>::zeros(3, 1), cv::Mat_<float>::zeros(3, 1),
+                        depth_sensor_->cameraModel()->intrinsicMatrix(), depth_sensor_->cameraModel()->distortionCoeffs(), out);
+#else
+      cv::projectPoints(in, cv::Mat_<float>::zeros(3, 1), cv::Mat_<float>::zeros(3, 1),
+                        depth_sensor_->cameraModel()->intrinsicMatrix(), cv::Mat(), out);
+#endif
+      Cloud2 image_corners(Size2(1, 4));
+      image_corners(0, 0) = Point2(out[0].x, out[0].y);
+      image_corners(0, 1) = Point2(out[1].x, out[1].y);
+      image_corners(0, 2) = Point2(out[2].x, out[2].y);
+      image_corners(0, 3) = Point2(out[3].x, out[3].y);
+//#else
+//      Cloud2 image_corners = depth_sensor_->cameraModel()->project3dToPixel(depth_corners);
+//#endif
+
+      boost::shared_ptr<std::vector<int> > indices = extractPlaneFromCloud(data.depthData(), image_corners);
+
+      data.fuseData();
+
+      boost::shared_ptr<std::vector<int> > new_indices = boost::shared_ptr<std::vector<int> >(new std::vector<int>());
+      new_indices->reserve(indices->size());
+      for (size_t i_i = 0; i_i < indices->size(); ++i_i)
+      {
+        const pcl::PointXYZRGB & point = (*data.fusedData())[(*indices)[i_i]];
+        if (point.r + point.g + point.b > 300)
+          new_indices->push_back((*indices)[i_i]);
+      }
+
+      pcl::StatisticalOutlierRemoval<pcl::PointXYZRGB> sor;
+      sor.setInputCloud(data.fusedData());
+      sor.setIndices(new_indices);
+      sor.setMeanK(10);
+      sor.setStddevMulThresh(1.0);
+      sor.filter(*new_indices);
+
+      pcl::ExtractIndices<pcl::PointXYZ> extract;
+      extract.setInputCloud(data.depthData());
+      extract.setIndices(new_indices);
+      extract.setNegative(false);
+      pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_p (new pcl::PointCloud<pcl::PointXYZ>);
+      extract.filter (*cloud_p);
+
+      /*std::stringstream ss;
+      ss << "cloud_" << c;
+      viz.addPointCloud(cloud_p, ss.str());*/
+
+      Cloud3 checkerboards_3d = PCLConversion<Scalar>::toPointMatrix(*data.depthData(), *new_indices);
+
+      Eigen::Vector4f centroid;
+      pcl::compute3DCentroid(*data.depthData(), *new_indices, centroid);
+      Point3 point = color_sensor_->pose().inverse() * centroid.cast<Scalar>().head<3>();
+
+      checkerboards_3d.transform(color_sensor_->pose().inverse());
+
+      Cloud2 proj = color_sensor_->cameraModel()->project3dToPixel(checkerboards_3d);
+
+      for (Size1 i = 0; i < proj.elements(); ++i)
+        cv::circle(tmp_image_rect, cv::Point(proj[i].x(), proj[i].y()), 1, cv::Scalar(c == 0 ? 255 : 0, c == 1 ? 255 : 0, c == 2 ? 255 : 0));
+
+      PlaneFit<Scalar> plane_fit;
+      Plane plane = plane_fit.fit(checkerboards_3d);
+
+      /*pcl::ModelCoefficients cf;
+      cf.values.resize(4);
+      cf.values[0] = plane.coeffs()[0];
+      cf.values[1] = plane.coeffs()[1];
+      cf.values[2] = plane.coeffs()[2];
+      cf.values[3] = plane.coeffs()[3];
+      viz.addPlane(cf, ss.str() + "_plane");
+
+      pcl::ModelCoefficients cf2;
+      cf2.values.resize(4);
+      cf2.values[0] = tmp_checkerboard.plane().coeffs()[0];
+      cf2.values[1] = tmp_checkerboard.plane().coeffs()[1];
+      cf2.values[2] = tmp_checkerboard.plane().coeffs()[2];
+      cf2.values[3] = tmp_checkerboard.plane().coeffs()[3];
+      viz.addPlane(cf2, ss.str() + "_cb");*/
+
+      point = plane.projection(point);
+
+      if (found)
+      {
+        planes.push_back(tmp_checkerboard.plane());
+        points.push_back(tmp_checkerboard.corners()[0]);
+        depth_planes.push_back(plane);
+        depth_points.push_back(point);
+      }
+
+    }
+    //viz.spin();
+
+    Point3 rgb_point, depth_point;
+
+
+    data_vec.push_back(std::vector<double>(20));
+
+    {
+      Eigen::Matrix<Scalar, 3, 3> N;
+      N.col(0) = planes.at(0).normal();
+      N.col(1) = planes.at(1).normal();
+      N.col(2) = planes.at(2).normal();
+
+      rgb_point = 1.0 / N.determinant() * (points.at(0).dot(N.col(0)) * N.col(1).cross(N.col(2)) +
+                                           points.at(1).dot(N.col(1)) * N.col(2).cross(N.col(0)) +
+                                           points.at(2).dot(N.col(2)) * N.col(0).cross(N.col(1)));
+
+      //Point2 pixel = color_sensor_->cameraModel()->project3dToPixel(rgb_point);
+      //cv::circle(tmp_image_rect, cv::Point(pixel.x(), pixel.y()), 3, cv::Scalar(0, 0, 0));
+
+      std::vector<cv::Point3f> points(1);
+      points[0] = cv::Point3f(rgb_point.x(), rgb_point.y(), rgb_point.z());
+
+      std::vector<cv::Point2f> out(1);
+      //cv::projectPoints(points, cv::Mat_<float>::zeros(3, 1), cv::Mat_<float>::zeros(3, 1),
+      //                  depth_sensor_->cameraModel()->intrinsicMatrix(), cv::Mat(), out);
+
+//#ifdef HERRERA
+      cv::projectPoints(points, cv::Mat_<float>::zeros(3, 1), cv::Mat_<float>::zeros(3, 1),
+                        color_sensor_->cameraModel()->intrinsicMatrix(), color_sensor_->cameraModel()->distortionCoeffs(), out);
+/*#else
+      cv::projectPoints(points, cv::Mat_<float>::zeros(3, 1), cv::Mat_<float>::zeros(3, 1),
+                        color_sensor_->cameraModel()->intrinsicMatrix(), cv::Mat(), out);
+#endif*/
+
+      cv::circle(tmp_image_rect, out[0], 3, cv::Scalar(0, 0, 255));
+
+      Scalar a0 = 90.0 - 180.0 / M_PI * std::acos(N.col(0).dot(N.col(1)));
+      Scalar a1 = 90.0 - 180.0 / M_PI * std::acos(N.col(1).dot(N.col(2)));
+      Scalar a2 = 90.0 - 180.0 / M_PI * std::acos(N.col(2).dot(N.col(0)));
+      ROS_INFO_STREAM("Pixel RGB:           " << out[0].x << ", " << out[0].y);
+      ROS_INFO_STREAM("Angular error RGB:   " << a0 << ", " << a1 << ", " << a2);
+
+      data_vec.back().at(0) = out[0].x;
+      data_vec.back().at(1) = out[0].y;
+      data_vec.back().at(2) = a0;
+      data_vec.back().at(3) = a1;
+      data_vec.back().at(4) = a2;
+
+    }
+
+    {
+      Eigen::Matrix<Scalar, 3, 3> N;
+      N.col(0) = depth_planes.at(0).normal();
+      N.col(1) = depth_planes.at(1).normal();
+      N.col(2) = depth_planes.at(2).normal();
+
+      depth_point = 1.0 / N.determinant() * (depth_points.at(0).dot(N.col(0)) * N.col(1).cross(N.col(2)) +
+                                             depth_points.at(1).dot(N.col(1)) * N.col(2).cross(N.col(0)) +
+                                             depth_points.at(2).dot(N.col(2)) * N.col(0).cross(N.col(1)));
+
+      //Point2 pixel = color_sensor_->cameraModel()->project3dToPixel(depth_point);
+      //cv::circle(tmp_image_rect, cv::Point(pixel.x(), pixel.y()), 3, cv::Scalar(0, 0, 255));
+
+      std::vector<cv::Point3f> points(1);
+      points[0] = cv::Point3f(depth_point.x(), depth_point.y(), depth_point.z());
+
+      std::vector<cv::Point2f> out(1);
+      //cv::projectPoints(points, cv::Mat_<float>::zeros(3, 1), cv::Mat_<float>::zeros(3, 1),
+      //                  depth_sensor_->cameraModel()->intrinsicMatrix(), cv::Mat(), out);
+
+//#ifdef HERRERA
+      cv::projectPoints(points, cv::Mat_<float>::zeros(3, 1), cv::Mat_<float>::zeros(3, 1),
+                        color_sensor_->cameraModel()->intrinsicMatrix(), color_sensor_->cameraModel()->distortionCoeffs(), out);
+/*#else
+      cv::projectPoints(points, cv::Mat_<float>::zeros(3, 1), cv::Mat_<float>::zeros(3, 1),
+                        color_sensor_->cameraModel()->intrinsicMatrix(), cv::Mat(), out);
+#endif*/
+
+      cv::circle(tmp_image_rect, out[0], 3, cv::Scalar(0, 0, 0));
+
+      Scalar a0 = 90.0 - 180.0 / M_PI * std::acos(N.col(0).dot(N.col(1)));
+      Scalar a1 = 90.0 - 180.0 / M_PI * std::acos(N.col(1).dot(N.col(2)));
+      Scalar a2 = 90.0 - 180.0 / M_PI * std::acos(N.col(2).dot(N.col(0)));
+      ROS_INFO_STREAM("Pixel DEPTH:         " << out[0].x << ", " << out[0].y);
+      ROS_INFO_STREAM("Angular error DEPTH: " << a0 << ", " << a1 << ", " << a2);
+
+      data_vec.back().at(5) = out[0].x;
+      data_vec.back().at(6) = out[0].y;
+      data_vec.back().at(7) = a0;
+      data_vec.back().at(8) = a1;
+      data_vec.back().at(9) = a2;
+
+    }
+
+    Scalar a0 = 180.0 / M_PI * std::acos(planes.at(0).normal().dot(depth_planes.at(0).normal()));
+    Scalar a1 = 180.0 / M_PI * std::acos(planes.at(1).normal().dot(depth_planes.at(1).normal()));
+    Scalar a2 = 180.0 / M_PI * std::acos(planes.at(2).normal().dot(depth_planes.at(2).normal()));
+
+    ROS_INFO_STREAM("Point RGB:           " << rgb_point.x() << ", " << rgb_point.y() << ", " << rgb_point.z());
+    ROS_INFO_STREAM("Point DEPTH:         " << depth_point.x() << ", " << depth_point.y() << ", " << depth_point.z());
+    ROS_INFO_STREAM("Depth error:         " << (rgb_point - depth_point).norm());
+    //ROS_INFO_STREAM(rgb_point.transpose() << " -- " << depth_point.transpose() << " => " << (rgb_point - depth_point).norm());
+    ROS_INFO_STREAM("Angular error:       " << (a0 > 90 ? 180 - a0 : a0) << ", " << (a1 > 90 ? 180 - a1 : a1) << ", " << (a2 > 90 ? 180 - a2 : a2));
+
+    ROS_INFO_STREAM(planes.at(0).normal().transpose() << " -- " << planes.at(1).normal().transpose() << " -- " << planes.at(2).normal().transpose() << " -- ");
+
+    cv::imshow("Image", tmp_image_rect);
+    cv::waitKey();
+
+    data_vec.back().at(10) = rgb_point.x();
+    data_vec.back().at(11) = rgb_point.y();
+    data_vec.back().at(12) = rgb_point.z();
+    data_vec.back().at(13) = depth_point.x();
+    data_vec.back().at(14) = depth_point.y();
+    data_vec.back().at(15) = depth_point.z();
+    data_vec.back().at(16) = (rgb_point - depth_point).norm();
+    data_vec.back().at(17) = (a0 > 90 ? 180 - a0 : a0);
+    data_vec.back().at(18) = (a1 > 90 ? 180 - a1 : a1);
+    data_vec.back().at(19) = (a2 > 90 ? 180 - a2 : a2);
+
+  }
+
+  for (size_t i = 0; i < data_vec.size(); ++i)
+    for (size_t j = 0; j < data_vec[i].size(); ++j)
+      std::cout << data_vec[i][j] << (j == data_vec[i].size() - 1 ? "\n" : ", ");
+
 
 }
 

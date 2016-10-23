@@ -7,6 +7,8 @@
 #include <calibration_common/pinhole/camera_model.h>
 #include <camera_info_manager/camera_info_manager.h>
 
+#include <kinect/depth/camera_model.h>
+
 #include <rgbd_calibration/calibration_node.h>
 
 using namespace camera_info_manager;
@@ -15,7 +17,7 @@ using namespace calibration_msgs;
 namespace calibration
 {
 
-CalibrationNode::CalibrationNode(ros::NodeHandle & node_handle)
+CalibrationNode::CalibrationNode (ros::NodeHandle & node_handle)
   : node_handle_(node_handle),
     publisher_(new Publisher(node_handle)),
     has_initial_transform_(false)
@@ -25,7 +27,11 @@ CalibrationNode::CalibrationNode(ros::NodeHandle & node_handle)
   if (not node_handle_.getParam("camera_calib_url", camera_calib_url_))
     ROS_FATAL("Missing \"camera_calib_url\" parameter!!");
 
+  if (not node_handle_.getParam("depth_camera_calib_url", depth_camera_calib_url_))
+      ROS_FATAL("Missing \"depth_camera_calib_url\" parameter!!");
+
   node_handle_.param("camera_name", camera_name_, std::string("camera"));
+  node_handle_.param("depth_camera_name", depth_camera_name_, std::string("depth_camera"));
 
   int undistortion_matrix_cell_size_x, undistortion_matrix_cell_size_y;
   node_handle_.param("undistortion_matrix/cell_size_x", undistortion_matrix_cell_size_x, 8);
@@ -75,7 +81,8 @@ CalibrationNode::CalibrationNode(ros::NodeHandle & node_handle)
 
 }
 
-bool CalibrationNode::initialize()
+bool
+CalibrationNode::initialize ()
 {
   if (not waitForMessages())
     return false;
@@ -88,14 +95,24 @@ bool CalibrationNode::initialize()
   BaseObject::Ptr world = boost::make_shared<BaseObject>();
   world->setFrameId("/world");
 
+  CameraInfoManager manager_depth(node_handle_, depth_camera_name_, depth_camera_calib_url_);
+  sensor_msgs::CameraInfo depth_camera_info = manager_depth.getCameraInfo();
+  depth_camera_info.binning_x = downsample_ratio_;
+  depth_camera_info.binning_y = downsample_ratio_;
+  KinectDepthCameraModel::Ptr depth_pinhole_model = boost::make_shared<KinectDepthCameraModel>(depth_camera_info);
+
+  std::cout << depth_pinhole_model->projectionMatrix() << std::endl;
+
   depth_sensor_ = boost::make_shared<KinectDepthSensor<UndistortionModel> >();
   depth_sensor_->setFrameId("/depth_sensor");
   depth_sensor_->setParent(world);
+  depth_sensor_->setCameraModel(depth_pinhole_model);
   Polynomial<Scalar, 2> depth_error_function(Vector3(depth_error_coeffs_[0], depth_error_coeffs_[1], depth_error_coeffs_[2]));
   depth_sensor_->setDepthErrorFunction(depth_error_function);
 
   CameraInfoManager manager(node_handle_, camera_name_, camera_calib_url_);
   PinholeCameraModel::ConstPtr pinhole_model = boost::make_shared<PinholeCameraModel>(manager.getCameraInfo());
+
 
   color_sensor_ = boost::make_shared<PinholeSensor>();
   color_sensor_->setFrameId("/pinhole_sensor");
@@ -117,7 +134,6 @@ bool CalibrationNode::initialize()
   LocalModel::Data::Ptr local_matrix = local_model->createMatrix(undistortion_matrix_cell_size_, LocalPolynomial::IdentityCoefficients());
   local_model->setMatrix(local_matrix);
 
-
   GlobalModel::Ptr global_model = boost::make_shared<GlobalModel>(images_size_);
   GlobalModel::Data::Ptr global_data = boost::make_shared<GlobalModel::Data>(Size2(2, 2), GlobalPolynomial::IdentityCoefficients());
   global_model->setMatrix(global_data);
@@ -137,12 +153,14 @@ bool CalibrationNode::initialize()
   return true;
 }
 
-void CalibrationNode::checkerboardArrayCallback(const CheckerboardArray::ConstPtr & msg)
+void
+CalibrationNode::checkerboardArrayCallback (const CheckerboardArray::ConstPtr & msg)
 {
   checkerboard_array_msg_ = msg;
 }
 
-bool CalibrationNode::waitForMessages() const
+bool
+CalibrationNode::waitForMessages () const
 {
   ros::Rate rate(1.0);
   ros::spinOnce();
@@ -155,14 +173,16 @@ bool CalibrationNode::waitForMessages() const
   return checkerboard_array_msg_;
 }
 
-Checkerboard::Ptr CalibrationNode::createCheckerboard(const CheckerboardMsg::ConstPtr & msg,
-                                                      int id)
+Checkerboard::Ptr
+CalibrationNode::createCheckerboard (const CheckerboardMsg::ConstPtr & msg,
+                                     int id)
 {
   return createCheckerboard(*msg, id);
 }
 
-Checkerboard::Ptr CalibrationNode::createCheckerboard(const CheckerboardMsg & msg,
-                                                      int id)
+Checkerboard::Ptr
+CalibrationNode::createCheckerboard (const CheckerboardMsg & msg,
+                                     int id)
 {
   std::stringstream ss;
   ss << "/checkerboard_" << id;

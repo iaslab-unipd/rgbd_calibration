@@ -5,22 +5,24 @@
 
 <group ns="$(arg ns)">
 
-    <arg name="path"                  default="$(env HOME)/.ros/calibration_data/2013-11-07_17-00-24" /> <!-- "$(env HOME)/.ros/calibration_data/prova" -->
-    <arg name="instances"             default="0" />
+    <arg name="path"                  default="$(env HOME)/Desktop/dataset/kinect1/" />
+    <arg name="instances"             default="1000" />
     <arg name="image_extension"       default="png" />
     <arg name="starting_index"        default="1" />
     <arg name="image_filename"        default="image_" />
-    <arg name="cloud_filename"        default="cloud_" />
+    <arg name="cloud_filename"        default="point_cloud_" />
 
-    <arg name="camera_name"           default="rgb_PS1080_PrimeSense" /> <!-- default="rgb_PS1080_PrimeSense" default="rgb_A00367A01433047A" -->
+    <arg name="camera_name"           default="rgb_A00367A01433047A" />
     <arg name="camera_type"           default="pinhole" />
     <arg name="camera_calib_url"      default="file://$(env HOME)/.ros/camera_info/$(arg camera_name).yaml" />
 
-    <arg name="depth_type"            default="kinect" />
-    <arg name="depth_calib_url"       default="file:///dev/null" />
+    <arg name="depth_camera_name"      default="depth_A00367A01433047A" />
+    <arg name="depth_type"             default="kinect1_depth" />
+    <arg name="depth_camera_calib_url" default="file://$(env HOME)/.ros/camera_info/$(arg depth_camera_name).yaml" />
     
-    <arg name="downsample_ratio"      default="2" />
+    <arg name="downsample_ratio"       default="2" />
 	
+	  <!-- launch-prefix="gdb -ex run - -args" -->
     <node pkg="rgbd_calibration" type="rgbd_offline_calibration" name="rgbd_offline" output="screen" required="true">
     
         <param name="path"             value="$(arg path)" />
@@ -34,19 +36,22 @@
         <param name="camera_type"      value="$(arg camera_type)" />
         <param name="camera_calib_url" value="$(arg camera_calib_url)" />
         
-        <param name="depth_type"       value="$(arg depth_type)" />
+        <param name="depth_camera_name"      value="$(arg depth_camera_name)" />
+        <param name="depth_type"             value="$(arg depth_type)" />
+        <param name="depth_camera_calib_url" value="$(arg depth_camera_calib_url)" />
         
         <rosparam>
           camera_pose:
             translation: {x: 0.0, y: 0.0, z: 0.0}
             rotation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
             
-          depth_error_function: [0.0, 0.0, 0.0035]
+          depth_error_function: [-0.00029, 0.00037, 0.001365]
           
           undistortion_matrix:
-            cell_size_x: 4
-            cell_size_y: 4
+            cell_size_x: 2
+            cell_size_y: 2
         </rosparam>
+        <!-- [0.0019, -0.0016, 0.0020] [0.00172, -0.00120, 0.00142]-->
         
         <param name="downsample_ratio" value="$(arg downsample_ratio)" />
         

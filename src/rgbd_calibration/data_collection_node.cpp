@@ -286,9 +286,10 @@ void DataCollectionNode::actionCallback(const Acquisition::ConstPtr & msg)
     if (file_index_ == 1)
       file << "data:" << std::endl;
     file << "  - id: " << file_index_ss.str() << std::endl;
-    file << "    timestamp: " << std::setprecision(19) << ros::Time::now().toSec() << std::setprecision(6) << std::endl;
-    file << "    distance: " << msg->distance << std::endl;
-    file << "    info: \"" << msg->info << "\"" << std::endl;
+    file << "    timestamp_image: " << std::setprecision(19) << image_msg_->header.stamp.toSec() << std::setprecision(6) << std::endl;
+    file << "    timestamp_depth: " << std::setprecision(19) << depth_image_msg_->header.stamp.toSec() << std::setprecision(6) << std::endl;
+    //file << "    distance: " << msg->distance << std::endl;
+    //file << "    info: \"" << msg->info << "\"" << std::endl;
     file.close();
 
     if (file_index_ == 1)
@@ -335,7 +336,7 @@ void DataCollectionNode::actionCallback(const Acquisition::ConstPtr & msg)
       saveDepth(depth_image_ptr->image, depth_file_name.str());
     }
 
-    ROS_INFO_STREAM("[" << ros::this_node::getName() << "] " << file_index_ss.str() << " saved");
+    ROS_INFO_STREAM_THROTTLE(1, "[" << ros::this_node::getName() << "] " << file_index_ss.str() << " saved");
     file_index_++;
 
   }

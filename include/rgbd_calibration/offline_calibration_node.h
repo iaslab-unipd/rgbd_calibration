@@ -33,14 +33,16 @@ class OfflineCalibrationNode : public CalibrationNode
 {
 public:
 
-  OfflineCalibrationNode(ros::NodeHandle & node_handle);
+  OfflineCalibrationNode (ros::NodeHandle & node_handle);
 
-  virtual ~OfflineCalibrationNode()
+  virtual
+  ~OfflineCalibrationNode()
   {
     // Do nothing
   }
 
-  virtual void spin();
+  virtual void
+  spin ();
 
 protected:
 

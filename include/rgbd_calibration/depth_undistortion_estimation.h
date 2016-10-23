@@ -97,7 +97,7 @@ public:
     global_model_ = global_model;
     global_fit_ = boost::make_shared<GlobalMatrixFitPCL>(global_model_);
     global_fit_->setDepthErrorFunction(depth_error_function_);
-    InverseGlobalModel::Data::Ptr matrix = boost::make_shared<InverseGlobalModel::Data>(Size2(1, 1), GlobalPolynomial::IdentityCoefficients());
+    InverseGlobalModel::Data::Ptr matrix = boost::make_shared<InverseGlobalModel::Data>(Size2(1, 1), InverseGlobalPolynomial::IdentityCoefficients());
     inverse_global_model_ = boost::make_shared<InverseGlobalModel>(global_model_->imageSize());
     inverse_global_model_->setMatrix(matrix);
     inverse_global_fit_ = boost::make_shared<InverseGlobalMatrixFitEigen>(inverse_global_model_);
@@ -141,7 +141,7 @@ public:
                                                                         Size1 y_index) const
   {
     const LocalMatrixFitPCL::DataBin & samples = local_fit_->getSamples(x_index, y_index);
-    Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic> eigen_samples(samples.size(), 3);
+    Eigen::Matrix<Scalar, Eigen::Dynamic, 3> eigen_samples(samples.size(), 3);
 
     for (Size1 i = 0; i < samples.size(); ++i)
     {
@@ -152,17 +152,20 @@ public:
     return eigen_samples;
   }
 
-//  Eigen::Matrix<Scalar, Eigen::Dynamic, 3> getGlobalSamples(Size1 x_index,
-//                                                            Size1 y_index) const
-//  {
-//    const std::vector<std::pair<Scalar, Scalar> > & samples = global_fit_->getSamples(x_index, y_index);
-//    Eigen::Matrix<Scalar, Eigen::Dynamic, 3> eigen_samples(samples.size(), 3);
+  Eigen::Matrix<Scalar, Eigen::Dynamic, 3> getGlobalSamples(Size1 x_index,
+                                                            Size1 y_index) const
+  {
+    const GlobalMatrixFitPCL::DataBin & samples = global_fit_->getSamples(x_index, y_index);
+    Eigen::Matrix<Scalar, Eigen::Dynamic, 3> eigen_samples(samples.size(), 3);
 
-//    for (Size1 i = 0; i < samples.size(); ++i)
-//      eigen_samples.row(i) << samples[i].first, samples[i].second, samples[i].first - samples[i].second;
+    for (Size1 i = 0; i < samples.size(); ++i)
+    {
+      const GlobalMatrixFitPCL::Data & sample = samples[i];
+      eigen_samples.row(i) << sample.x_, sample.y_, sample.weight_;
+    }
 
-//    return eigen_samples;
-//  }
+    return eigen_samples;
+  }
 
   void setDepthErrorFunction(const Polynomial<Scalar, 2> & depth_error_function)
   {

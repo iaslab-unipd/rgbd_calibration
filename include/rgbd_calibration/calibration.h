@@ -48,96 +48,136 @@ public:
   typedef boost::shared_ptr<Calibration> Ptr;
   typedef boost::shared_ptr<const Calibration> ConstPtr;
 
-  inline void setColorSensor(const PinholeSensor::Ptr & color_sensor)
+  inline void
+  setColorSensor (const PinholeSensor::Ptr & color_sensor)
   {
     color_sensor_ = color_sensor;
   }
 
-  inline void setDepthSensor(const KinectDepthSensor<UndistortionModel>::Ptr & depth_sensor)
+  inline void
+  setDepthSensor (const KinectDepthSensor<UndistortionModel>::Ptr & depth_sensor)
   {
     depth_sensor_ = depth_sensor;
+
+    depth_intrinsics_.resize(4);
+    depth_intrinsics_[0] = depth_sensor->cameraModel()->fx();
+    depth_intrinsics_[1] = depth_sensor->cameraModel()->fy();
+    depth_intrinsics_[2] = depth_sensor->cameraModel()->cx();
+    depth_intrinsics_[3] = depth_sensor->cameraModel()->cy();
   }
 
-  inline void setCheckerboards(const std::vector<Checkerboard::ConstPtr> & cb_vec)
+  const std::vector<double> &
+  optimizedIntrinsics () const
+  {
+	return depth_intrinsics_;
+  }
+
+  inline void
+  setCheckerboards (const std::vector<Checkerboard::ConstPtr> & cb_vec)
   {
     cb_vec_ = cb_vec;
   }
 
-  inline void setPublisher(const Publisher::Ptr & publisher)
+  inline void
+  setPublisher (const Publisher::Ptr & publisher)
   {
     publisher_ = publisher;
   }
 
-  inline void setDownSampleRatio(int ratio)
+  inline void
+  setDownSampleRatio (int ratio)
   {
     assert(ratio > 0);
     ratio_ = ratio;
   }
 
-  void addData(const cv::Mat & image,
-               const PCLCloud3::ConstPtr & cloud);
+  void
+  addData (const cv::Mat & image,
+           const PCLCloud3::ConstPtr & cloud);
 
-  void addTestData(const cv::Mat & image,
-                   const PCLCloud3::ConstPtr & cloud);
+//  void
+//  addTestData (const cv::Mat & image,
+//               const PCLCloud3::ConstPtr & cloud);
 
-  inline void setEstimateInitialTransform(bool estimate_initial_trasform)
+  inline void
+  setEstimateInitialTransform (bool estimate_initial_trasform)
   {
     estimate_initial_trasform_ = estimate_initial_trasform;
   }
 
-  void initDepthUndistortionModel()
+  void
+  initDepthUndistortionModel ()
   {
     assert(local_matrix_ and global_matrix_);
     estimate_depth_und_model_ = true;
 
     depth_undistortion_estimation_ = boost::make_shared<DepthUndistortionEstimation>();
-    depth_undistortion_estimation_->setDepthErrorFunction(depth_sensor_->depthErrorFunction());
+//    depth_undistortion_estimation_->setDepthErrorFunction(depth_sensor_->depthErrorFunction());
+    depth_undistortion_estimation_->setDepthErrorFunction(Polynomial<Scalar, 2, 0>(Vector3(0.000, 0.000, 0.0035)));
     depth_undistortion_estimation_->setLocalModel(local_model_);
     depth_undistortion_estimation_->setGlobalModel(global_model_);
     depth_undistortion_estimation_->setMaxThreads(8);
   }
 
-  inline void setForceAll(bool force)
-  {
-    force_ = force;
-  }
-
-  inline void addCheckerboardViews(const CheckerboardViews::Ptr & rgbd_cb)
+  inline void
+  addCheckerboardViews (const CheckerboardViews::Ptr & rgbd_cb)
   {
     cb_views_vec_.push_back(rgbd_cb);
   }
 
-  inline void setLocalModel(const LocalModel::Ptr & model)
+  inline void
+  setLocalModel (const LocalModel::Ptr & model)
   {
     local_model_ = model;
     local_matrix_ = boost::make_shared<LocalMatrixPCL>(local_model_);
   }
 
-  inline void setGlobalModel(const GlobalModel::Ptr & model)
+  const LocalModel::Ptr &
+  localModel () const
+  {
+	return local_model_;
+  }
+
+  inline void
+  setGlobalModel (const GlobalModel::Ptr & model)
   {
     global_model_ = model;
     global_matrix_ = boost::make_shared<GlobalMatrixPCL>(global_model_);
   }
 
-  void perform();
+  const GlobalModel::Ptr &
+  globalModel () const
+  {
+	return global_model_;
+  }
 
-  void optimize();
+  void
+  perform();
 
-  void publishData() const;
+  void
+  optimize();
+
+  void
+  publishData() const;
 
 protected:
 
-  void estimateInitialTransform();
+  void
+  estimateInitialTransform ();
 
-  void estimateTransform(const std::vector<CheckerboardViews::Ptr> & rgbd_cb_vec);
+  void
+  estimateTransform (const std::vector<CheckerboardViews::Ptr> & rgbd_cb_vec);
 
-  void optimizeTransform(const std::vector<CheckerboardViews::Ptr> & rgbd_cb_vec);
+  void
+  optimizeTransform (const std::vector<CheckerboardViews::Ptr> & rgbd_cb_vec);
 
-  void optimizeAll(const std::vector<CheckerboardViews::Ptr> & rgbd_cb_vec);
+  void
+  optimizeAll (const std::vector<CheckerboardViews::Ptr> & rgbd_cb_vec);
 
-  void addData_(const cv::Mat & image,
-                const PCLCloud3::ConstPtr & cloud,
-                std::vector<RGBDData::ConstPtr> & vec);
+  void
+  addData_ (const cv::Mat & image,
+            const PCLCloud3::ConstPtr & cloud,
+            std::vector<RGBDData::ConstPtr> & vec);
 
   PinholeSensor::Ptr color_sensor_;
   KinectDepthSensor<UndistortionModel>::Ptr depth_sensor_;
@@ -148,7 +188,6 @@ protected:
 
   bool estimate_depth_und_model_;
   bool estimate_initial_trasform_;
-  bool force_;
   int ratio_;
 
   LocalModel::Ptr local_model_;
@@ -164,6 +203,8 @@ protected:
 
   std::vector<CheckerboardViews::Ptr> cb_views_vec_;
   std::vector<DepthUndistortionEstimation::DepthData::Ptr> depth_data_vec_;
+
+  std::vector<double> depth_intrinsics_;
 
 };
 

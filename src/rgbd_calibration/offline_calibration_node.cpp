@@ -16,9 +16,10 @@
 #include <calibration_common/pinhole/camera_model.h>
 #include <camera_info_manager/camera_info_manager.h>
 
+#include <kinect/depth/polynomial_matrix_io.h>
 #include <rgbd_calibration/offline_calibration_node.h>
 
-#include <swissranger_camera/utility.h>
+//#include <swissranger_camera/utility.h>
 #include <pcl/conversions.h>
 
 using namespace camera_info_manager;
@@ -29,10 +30,10 @@ namespace fs = boost::filesystem;
 namespace calibration
 {
 
-OfflineCalibrationNode::OfflineCalibrationNode(ros::NodeHandle & node_handle)
-  : CalibrationNode(node_handle)
+OfflineCalibrationNode::OfflineCalibrationNode (ros::NodeHandle & node_handle)
+  : CalibrationNode(node_handle),
+	starting_index_(0)
 {
-
   if (not node_handle_.getParam("path", path_))
     ROS_FATAL("Missing \"path\" parameter!!");
 
@@ -55,7 +56,8 @@ OfflineCalibrationNode::OfflineCalibrationNode(ros::NodeHandle & node_handle)
     ROS_FATAL("Missing \"depth_type\" parameter!! Use \"kinect1_depth\" or \"swiss_ranger_depth\"");
 }
 
-void OfflineCalibrationNode::spin()
+void
+OfflineCalibrationNode::spin ()
 {
 
   fs::path path(path_);
@@ -106,35 +108,66 @@ void OfflineCalibrationNode::spin()
       pcl::PCDReader pcd_reader;
       if (depth_type_ == KINECT1_DEPTH)
       {
-         cloud = boost::make_shared<PCLCloud3>();
+        cloud = boost::make_shared<PCLCloud3>();
 
         if (pcd_reader.read(cloud_it->second, *cloud) < 0)
         {
           ROS_WARN_STREAM(cloud_it->second << " not valid!");
           continue;
         }
+
+        const Scalar & fx = depth_sensor_->cameraModel()->fx() * depth_sensor_->cameraModel()->binningX();
+        const Scalar & fy = depth_sensor_->cameraModel()->fy() * depth_sensor_->cameraModel()->binningY();
+    	const Scalar & cx = depth_sensor_->cameraModel()->cx() * depth_sensor_->cameraModel()->binningX();
+    	const Scalar & cy = depth_sensor_->cameraModel()->cy() * depth_sensor_->cameraModel()->binningY();
+
+        for (int k = 0; k < cloud->width; ++k)
+        {
+    		for (Size1 j = 0; j < cloud->height; ++j)
+    		{
+    		  cloud->at(k, j).x = (k - cx) * cloud->at(k, j).z / fx;
+    		  cloud->at(k, j).y = (j - cy) * cloud->at(k, j).z / fy;
+    		}
+        }
+
+        /*for (size_t v = 0; v < cloud->height; ++v)
+        {
+          for (size_t u = 0; u < cloud->width; ++u)
+          {
+            PCLPoint3 & pt = cloud->points[u + v * cloud->width];
+//            pt.x = (u - 314.5) * pt.z / 575.8157348632812;
+//            pt.y = (v - 235.5) * pt.z / 575.8157348632812;
+//            pt.x = (u - 309.7947658766498) * pt.z / 584.3333129882812;
+//            pt.y = (v - 245.9642466885198) * pt.z / 582.8702392578125;
+            pt.x = (u - depth_sensor_->cameraModel()->cx()) * pt.z / depth_sensor_->cameraModel()->fx();
+            pt.y = (v - depth_sensor_->cameraModel()->cy()) * pt.z / depth_sensor_->cameraModel()->fy();
+          }
+        }*/
+
+//        pcl::PCDWriter pcd_writer;
+//        pcd_writer.write(cloud_it->second + "_rev.pcd", *cloud);
+
       }
       else if (depth_type_ == SWISS_RANGER_DEPTH)
       {
-        pcl::PCLPointCloud2Ptr pcl_cloud = boost::make_shared<pcl::PCLPointCloud2>();
-        sensor_msgs::PointCloud2Ptr ros_cloud = boost::make_shared<sensor_msgs::PointCloud2>();
-        sr::Utility sr_utility;
-        if (pcd_reader.read(cloud_it->second, *pcl_cloud) < 0)
-        {
-          ROS_WARN_STREAM(cloud_it->second << " not valid!");
-          continue;
-        }
-        pcl_conversions::fromPCL(*pcl_cloud, *ros_cloud);
-
-        sr_utility.setConfidenceThreshold(0.90f);
-        sr_utility.setInputCloud(ros_cloud);
-        sr_utility.setIntensityType(sr::Utility::INTENSITY_8BIT);
-        sr_utility.setConfidenceType(sr::Utility::CONFIDENCE_8BIT);
-        sr_utility.setNormalizeIntensity(true);
-        sr_utility.split(sr::Utility::CLOUD);
-
-        cloud = sr_utility.cloud();
-
+//        pcl::PCLPointCloud2Ptr pcl_cloud = boost::make_shared<pcl::PCLPointCloud2>();
+//        sensor_msgs::PointCloud2Ptr ros_cloud = boost::make_shared<sensor_msgs::PointCloud2>();
+//        sr::Utility sr_utility;
+//        if (pcd_reader.read(cloud_it->second, *pcl_cloud) < 0)
+//        {
+//          ROS_WARN_STREAM(cloud_it->second << " not valid!");
+//          continue;
+//        }
+//        pcl_conversions::fromPCL(*pcl_cloud, *ros_cloud);
+//
+//        sr_utility.setConfidenceThreshold(0.90f);
+//        sr_utility.setInputCloud(ros_cloud);
+//        sr_utility.setIntensityType(sr::Utility::INTENSITY_8BIT);
+//        sr_utility.setConfidenceType(sr::Utility::CONFIDENCE_8BIT);
+//        sr_utility.setNormalizeIntensity(true);
+//        sr_utility.split(sr::Utility::CLOUD);
+//
+//        cloud = sr_utility.cloud();
       }
 
       calibration_->addData(image, cloud);
@@ -142,9 +175,6 @@ void OfflineCalibrationNode::spin()
 
       if (added == instances_)
         break;
-
-      if (added % 10 == 0)
-        calibration_->addTestData(image, cloud);
 
       ROS_DEBUG_STREAM("(" << image_it->second << ", " << cloud_it->second << ") added.");
     }
@@ -158,28 +188,57 @@ void OfflineCalibrationNode::spin()
 
   calibration_->perform();
 
+  PolynomialUndistortionMatrixIO<LocalPolynomial> local_io;
+  local_io.write(*calibration_->localModel(), path_ + "local_matrix.txt");
+
   tf::poseEigenToMsg(color_sensor_->pose(), pose_msg);
   ROS_INFO_STREAM("Estimated transform:\n" << pose_msg);
 
   calibration_->optimize();
 
+  PolynomialUndistortionMatrixIO<GlobalPolynomial> global_io;
+  global_io.write(*calibration_->globalModel(), path_ + "global_matrix.txt");
+
   tf::poseEigenToMsg(color_sensor_->pose(), pose_msg);
   ROS_INFO_STREAM("Optimized transform:\n" << pose_msg);
 
-  ros::Rate rate(1.0);
+  std::ofstream transform_file;
+  transform_file.open((path_ + "camera_pose.yaml").c_str());
+  transform_file << pose_msg;
+  transform_file.close();
 
-  while (ros::ok())
-  {
-    calibration_->publishData();
-    rate.sleep();
-  }
+  const std::vector<double> & depth_intrinsics = calibration_->optimizedIntrinsics();
+
+  ROS_INFO_STREAM("fx = " << depth_sensor_->cameraModel()->binningX() * depth_intrinsics[0]);
+  ROS_INFO_STREAM("fy = " << depth_sensor_->cameraModel()->binningY() * depth_intrinsics[1]);
+  ROS_INFO_STREAM("cx = " << depth_sensor_->cameraModel()->binningX() * depth_intrinsics[2]);
+  ROS_INFO_STREAM("cy = " << depth_sensor_->cameraModel()->binningY() * depth_intrinsics[3]);
+
+  std::ofstream intrinsics_file;
+  intrinsics_file.open((path_ + "depth_intrinsics.yaml").c_str());
+  intrinsics_file << "intrinsics:" << std::endl;
+  intrinsics_file << "  fx: " << depth_sensor_->cameraModel()->binningX() * depth_intrinsics[0] << std::endl;
+  intrinsics_file << "  fy: " << depth_sensor_->cameraModel()->binningY() * depth_intrinsics[1] << std::endl;
+  intrinsics_file << "  cx: " << depth_sensor_->cameraModel()->binningX() * depth_intrinsics[2] << std::endl;
+  intrinsics_file << "  cy: " << depth_sensor_->cameraModel()->binningY() * depth_intrinsics[3] << std::endl;
+  intrinsics_file.close();
+
+
+//  ros::Rate rate(1.0);
+
+//  while (ros::ok())
+//  {
+//    calibration_->publishData();
+//    rate.sleep();
+//  }
 
 }
 
 } /* namespace calibration */
 
-int main(int argc,
-         char ** argv)
+int
+main (int argc,
+      char ** argv)
 {
   ros::init(argc, argv, "offline_calibration");
   ros::NodeHandle node_handle("~");
@@ -190,10 +249,8 @@ int main(int argc,
     if (not calib_node.initialize())
       return 0;
     calib_node.spin();
-
-//    ros::spin();
   }
-  catch (std::runtime_error & error)
+  catch (const std::runtime_error & error)
   {
     ROS_FATAL_STREAM("Calibration error: " << error.what());
     return 1;

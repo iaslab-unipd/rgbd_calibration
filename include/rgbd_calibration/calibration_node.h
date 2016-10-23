@@ -48,28 +48,35 @@ class CalibrationNode
 {
 public:
 
-  CalibrationNode(ros::NodeHandle & node_handle);
+  CalibrationNode (ros::NodeHandle & node_handle);
 
-  virtual ~CalibrationNode()
+  virtual
+  ~CalibrationNode ()
   {
     // Do nothing
   }
 
-  virtual bool initialize();
+  virtual bool
+  initialize ();
 
-  virtual void spin() = 0;
+  virtual void
+  spin () = 0;
 
-  static Checkerboard::Ptr createCheckerboard(const calibration_msgs::CheckerboardMsg::ConstPtr & msg,
-                                              int id);
+  static Checkerboard::Ptr
+  createCheckerboard (const calibration_msgs::CheckerboardMsg::ConstPtr & msg,
+                      int id);
 
-  static Checkerboard::Ptr createCheckerboard(const calibration_msgs::CheckerboardMsg & msg,
-                                              int id);
+  static Checkerboard::Ptr
+  createCheckerboard (const calibration_msgs::CheckerboardMsg & msg,
+                      int id);
 
 protected:
 
-  void checkerboardArrayCallback(const calibration_msgs::CheckerboardArray::ConstPtr & msg);
+  void
+  checkerboardArrayCallback (const calibration_msgs::CheckerboardArray::ConstPtr & msg);
 
-  bool waitForMessages() const;
+  bool
+  waitForMessages () const;
 
   ros::NodeHandle node_handle_;
 
@@ -81,6 +88,8 @@ protected:
 
   std::string camera_calib_url_;
   std::string camera_name_;
+  std::string depth_camera_calib_url_;
+  std::string depth_camera_name_;
 
   bool has_initial_transform_;
   Transform initial_transform_;

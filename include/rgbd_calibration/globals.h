@@ -44,6 +44,7 @@ namespace calibration
 
 typedef Polynomial<Scalar, L_POLY_DEGREE, L_POLY_MIN_DEGREE>  LocalPolynomial;
 typedef Polynomial<Scalar, G_POLY_DEGREE, G_POLY_MIN_DEGREE>  GlobalPolynomial;
+typedef Polynomial<Scalar, G_POLY_DEGREE, 0>  InverseGlobalPolynomial;
 
 typedef PolynomialMatrixSmoothModel<LocalPolynomial>                            LocalModel;
 typedef PolynomialMatrixPCL<LocalModel, Scalar, PCLPoint3>                      LocalMatrixPCL;
@@ -57,11 +58,11 @@ typedef PolynomialMatrixEigen<GlobalModel, Scalar>                              
 typedef PolynomialMatrixSmoothModelFitPCL<GlobalPolynomial, Scalar, PCLPoint3>  GlobalMatrixFitPCL;
 typedef PolynomialMatrixSmoothModelFitEigen<GlobalPolynomial, Scalar>           GlobalMatrixFitEigen;
 
-typedef PolynomialMatrixSimpleModel<GlobalPolynomial>                           InverseGlobalModel;
+typedef PolynomialMatrixSimpleModel<InverseGlobalPolynomial>                           InverseGlobalModel;
 typedef PolynomialMatrixPCL<InverseGlobalModel, Scalar, PCLPoint3>              InverseGlobalMatrixPCL;
 typedef PolynomialMatrixEigen<InverseGlobalModel, Scalar>                       InverseGlobalMatrixEigen;
-typedef PolynomialMatrixSimpleModelFitPCL<GlobalPolynomial, Scalar, PCLPoint3>  InverseGlobalMatrixFitPCL;
-typedef PolynomialMatrixSimpleModelFitEigen<GlobalPolynomial, Scalar>           InverseGlobalMatrixFitEigen;
+typedef PolynomialMatrixSimpleModelFitPCL<InverseGlobalPolynomial, Scalar, PCLPoint3>  InverseGlobalMatrixFitPCL;
+typedef PolynomialMatrixSimpleModelFitEigen<InverseGlobalPolynomial, Scalar>           InverseGlobalMatrixFitEigen;
 
 //typedef PolynomialFunctionModel<GlobalPolynomial>::Data UFunctionData;
 //typedef PolynomialFunctionPCL<GlobalPolynomial, PCLPoint3> UFunctionPCL;

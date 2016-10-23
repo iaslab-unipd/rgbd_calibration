@@ -1,0 +1,67 @@
+<?xml version="1.0"?>
+<launch>
+
+<arg name="ns"  default="calibration" />
+<arg name="dir" default="$(env HOME)/Desktop/dataset/kinect1" /> 
+
+<group ns="$(arg ns)">
+
+    <arg name="path"                   default="/home/filippo/Desktop/visual_odometry3/" /> 
+    <arg name="instances"              default="1000" />
+    <arg name="image_extension"        default="png" />
+    <arg name="starting_index"         default="1" />
+    <arg name="image_filename"         default="image_" />
+    <arg name="cloud_filename"         default="cloud_" />
+
+    <arg name="camera_name"            default="rgb_A00367A01433047A" />
+    <arg name="camera_calib_url"       default="file://$(env HOME)/.ros/camera_info/$(arg camera_name).yaml" />
+    
+    <arg name="depth_camera_name"      default="depth_A00367A01433047A" />
+    <arg name="depth_type"             default="kinect1_depth" />
+    <arg name="depth_camera_calib_url" default="file://$(env HOME)/.ros/camera_info/$(arg depth_camera_name).yaml" />
+    
+    <arg name="downsample_ratio"       default="1" />
+    
+    <arg name="local_und_matrix_file"  default="$(arg dir)/local_matrix.txt" />
+    <arg name="global_und_matrix_file" default="$(arg dir)/global_matrix.txt" />
+    
+    <arg name="only_show"              default="false" />
+	
+    <node pkg="rgbd_calibration" type="test_calibration" name="test_calibration" output="screen" required="true">
+    
+        <param name="path"             value="$(arg path)" />
+        <param name="instances"        value="$(arg instances)" />
+        <param name="image_extension"  value="$(arg image_extension)" />
+        <param name="starting_index"   value="$(arg starting_index)" />
+        <param name="image_filename"   value="$(arg image_filename)" />
+        <param name="cloud_filename"   value="$(arg cloud_filename)" />
+        
+        <param name="camera_name"      value="$(arg camera_name)" />
+        <param name="camera_calib_url" value="$(arg camera_calib_url)" />
+        
+        <param name="depth_type"       value="$(arg depth_type)" />
+        <param name="depth_camera_name"      value="$(arg depth_camera_name)" />
+        <param name="depth_camera_calib_url" value="$(arg depth_camera_calib_url)" />
+        
+        <rosparam param="camera_pose" command="load" file="$(arg dir)/camera_pose.yaml" />
+        
+        <param name="downsample_ratio" value="$(arg downsample_ratio)" />
+        
+        <param name="local_und_matrix_file" value="$(arg local_und_matrix_file)" />
+        <param name="global_und_matrix_file" value="$(arg global_und_matrix_file)" />
+        
+        <rosparam command="load" file="$(arg dir)/depth_intrinsics.yaml" />
+        
+        <param name="only_show" value="$(arg only_show)" />
+        
+        
+    </node>
+
+    <node pkg="rostopic" type="rostopic" name="checkerboards_pub" output="screen" 
+          args="pub -f $(find rgbd_calibration)/conf/checkerboards.yaml test_calibration/checkerboard_array
+                calibration_msgs/CheckerboardArray --latch">
+    </node>
+
+</group>
+
+</launch>

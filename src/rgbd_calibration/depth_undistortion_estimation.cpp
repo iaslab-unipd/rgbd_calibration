@@ -115,7 +115,7 @@ void DepthUndistortionEstimation::estimateLocalModel()
 //        RGBD_INFO(data.id_, "Plane extracted!!");
         plane_info_map_[data_vec_[i + th]] = plane_info;
 
-        if (i + th == 73 or i + th == 80)
+        if ((i + th) % 10 == 0)
         {
           PCLCloud3::Ptr tmp_und_cloud = boost::make_shared<PCLCloud3>(*und_cloud, *plane_info.indices_);
           PCLCloud3::Ptr tmp_cloud = boost::make_shared<PCLCloud3>(cloud, *plane_info.indices_);
@@ -160,7 +160,7 @@ void DepthUndistortionEstimation::estimateLocalModel()
         {
           int r = (*plane_info.indices_)[j] / w;
           int c = (*plane_info.indices_)[j] % w;
-          if ((r - h/2)*(r - h/2) + (c - w/2)*(c - w/2) < (h/3)*(h/3))
+          if ((r - h/2)*(r - h/2) + (c - w/2)*(c - w/2) < (h/2)*(h/2))
             indices.push_back((*plane_info.indices_)[j]);
         }
         Plane fitted_plane = PlaneFit<Scalar>::fit(PCLConversion<Scalar>::toPointMatrix(cloud, indices)/*, plane_info.std_dev_*/);
@@ -182,7 +182,7 @@ void DepthUndistortionEstimation::estimateLocalModel()
 
         }
 
-        Line line(gt_cb.center(), Point3::UnitZ());
+        Line line(Vector3::Zero(), gt_cb.center().normalized());
         RGBD_INFO(data.id_, "Transformed z: " << gt_cb.center().z() << " -> " << und_color_cb_center.z()
                                               << " (Real z: " << line.intersectionPoint(fitted_plane).z() << ")");
 
@@ -253,7 +253,7 @@ void DepthUndistortionEstimation::estimateLocalModelReverse()
         {
           int r = (*plane_info.indices_)[j] / w;
           int c = (*plane_info.indices_)[j] % w;
-          if ((r - h/2)*(r - h/2) + (c - w/2)*(c - w/2) < (h/3)*(h/3))
+          if ((r - h/2)*(r - h/2) + (c - w/2)*(c - w/2) < (h/2)*(h/2))
             indices->push_back((*plane_info.indices_)[j]);
         }
         Plane fitted_plane = PlaneFit<Scalar>::fit(PCLConversion<Scalar>::toPointMatrix(cloud, *indices)/*, plane_info.std_dev_*/);
@@ -274,7 +274,7 @@ void DepthUndistortionEstimation::estimateLocalModelReverse()
           plane_info_map_[data_vec_[i + th]].indices_ = indices;
         }
 
-        Line line(gt_cb.center(), Point3::UnitZ());
+        Line line(Vector3::Zero(), gt_cb.center().normalized());
         RGBD_INFO(data.id_, "Transformed z: " << gt_cb.center().z() << " -> " << und_color_cb_center.z()
                                               << " (Real z: " << line.intersectionPoint(fitted_plane).z() << ")");
 

@@ -53,6 +53,8 @@ public:
   virtual bool initialize();
 
   virtual void spin();
+  virtual void spin2();
+  virtual void spin3();
 
   static Checkerboard::Ptr createCheckerboard(const calibration_msgs::CheckerboardMsg::ConstPtr & msg,
                                               int id);
@@ -76,6 +78,8 @@ protected:
 
   std::string camera_calib_url_;
   std::string camera_name_;
+  std::string depth_camera_calib_url_;
+  std::string depth_camera_name_;
 
   Pose camera_pose_;
 
@@ -89,6 +93,7 @@ protected:
 
   Publisher::Ptr publisher_;
 
+  std::vector<Scalar> depth_intrinsics_;
   int instances_;
   int starting_index_;
 

@@ -2,26 +2,28 @@
 <launch>
 
 <arg name="ns"  default="calibration" />
-<arg name="dir" default="/tmp" /> 
+<arg name="dir" default="$(env HOME)/Desktop/dataset/kinect2" /> 
 
 <group ns="$(arg ns)">
 
-    <arg name="path"                   default="$(env HOME)/.ros/calibration_data/test_cb/kinect1" /> <!-- "$(env HOME)/.ros/calibration_data/2013-11-07_17-00-24" -->
-    <arg name="instances"              default="0" />
+    <arg name="path"                   default="$(env HOME)/Desktop/dataset_cubo/kinect2/" /> 
+    <arg name="instances"              default="1000" />
     <arg name="image_extension"        default="png" />
     <arg name="starting_index"         default="1" />
     <arg name="image_filename"         default="image_" />
-    <arg name="cloud_filename"         default="cloud_" />
+    <arg name="cloud_filename"         default="point_cloud_" />
 
-    <arg name="camera_name"            default="rgb_A00367A01433047A" /> <!-- "rgb_A00367A01433047A" /-->
+    <arg name="camera_name"            default="rgb_507663142542" />
     <arg name="camera_calib_url"       default="file://$(env HOME)/.ros/camera_info/$(arg camera_name).yaml" />
     
+    <arg name="depth_camera_name"      default="depth_507663142542" />
     <arg name="depth_type"             default="kinect1_depth" />
+    <arg name="depth_camera_calib_url" default="file://$(env HOME)/.ros/camera_info/$(arg depth_camera_name).yaml" />
     
     <arg name="downsample_ratio"       default="1" />
     
     <arg name="local_und_matrix_file"  default="$(arg dir)/local_matrix.txt" />
-    <arg name="global_und_matrix_file" default="$(arg dir)/opt_global_matrix.txt" />
+    <arg name="global_und_matrix_file" default="$(arg dir)/global_matrix.txt" />
     
     <arg name="only_show"              default="false" />
 	
@@ -38,6 +40,8 @@
         <param name="camera_calib_url" value="$(arg camera_calib_url)" />
         
         <param name="depth_type"       value="$(arg depth_type)" />
+        <param name="depth_camera_name"      value="$(arg depth_camera_name)" />
+        <param name="depth_camera_calib_url" value="$(arg depth_camera_calib_url)" />
         
         <rosparam param="camera_pose" command="load" file="$(arg dir)/camera_pose.yaml" />
         
@@ -46,10 +50,15 @@
         <param name="local_und_matrix_file" value="$(arg local_und_matrix_file)" />
         <param name="global_und_matrix_file" value="$(arg global_und_matrix_file)" />
         
+        <rosparam command="load" file="$(arg dir)/depth_intrinsics.yaml" />
         
         <param name="only_show" value="$(arg only_show)" />
         
-        
+        <rosparam>
+          depth_image:
+            cols: 512
+            rows: 424
+        </rosparam>
     </node>
 
     <node pkg="rostopic" type="rostopic" name="checkerboards_pub" output="screen" 
