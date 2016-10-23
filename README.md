@@ -1,6 +1,6 @@
 ## Dependencies
 
-This package depends on [calibration_toolkit](https://github.com/iaslab-unipd/calibration_toolkit) version 0.3 (i.e. `git checkout v0.3`).
+This package depends on [calibration_toolkit](https://github.com/iaslab-unipd/calibration_toolkit) version 0.3.1 (i.e. `git checkout v0.3.1`).
 
 ## Initial Setup
 
