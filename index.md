@@ -1,6 +1,19 @@
 ---
 layout: default
+title: RGB-D Calibration
 ---
+
+# [](#software)Software
+
+The code is available on [GitHub]({{ site.github.repository_url }}) under a [BSD license](https://opensource.org/licenses/BSD-3-Clause).
+
+Main dependencies:
+
+- [ROS Indigo](http://wiki.ros.org/indigo)
+- [Eigen](http://eigen.tuxfamily.org/)
+- [PCL](http://pointclouds.org/)
+- [OpenCV](http://opencv.org/)
+- [Ceres Solver](http://ceres-solver.org/)
 
 # [](#results)Results
 

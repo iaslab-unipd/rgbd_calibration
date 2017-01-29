@@ -15,7 +15,7 @@
 # in the templates via {{ site.myvariable }}.
 title: RGB-D Calibration
 email: bassofil@gmail.com
-description: Website under construction #RGB-D Calibration
+description: A human-friendly, reliable and accurate calibration (extrinsic and instrinsic parameters) framework for RGB-D cameras. #RGB-D Calibration
 baseurl: "" # the subpath of your site, e.g. /blog
 url: "http://iaslab-unipd.github.io/rgbd_calibration" # the base hostname & protocol for your site, e.g. http://example.com
 github_username:  bassofil
