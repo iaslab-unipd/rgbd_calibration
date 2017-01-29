@@ -1,0 +1,44 @@
+# Welcome to Jekyll!
+#
+# This config file is meant for settings that affect your whole blog, values
+# which you are expected to set up once and rarely edit after that. If you find
+# yourself editing this file very often, consider using Jekyll's data files
+# feature for the data you need to update frequently.
+#
+# For technical reasons, this file is *NOT* reloaded automatically when you use
+# 'bundle exec jekyll serve'. If you change this file, please restart the server process.
+
+# Site settings
+# These are used to personalize your new site. If you look in the HTML files,
+# you will see them accessed via {{ site.title }}, {{ site.email }}, and so on.
+# You can create any custom variable you would like, and they will be accessible
+# in the templates via {{ site.myvariable }}.
+title: RGB-D Calibration
+email: bassofil@gmail.com
+description: Website under construction #RGB-D Calibration
+baseurl: "" # the subpath of your site, e.g. /blog
+url: "http://iaslab-unipd.github.io/rgbd_calibration" # the base hostname & protocol for your site, e.g. http://example.com
+github_username:  bassofil
+show_downloads: true
+show_arxiv: true
+arxiv_url: "http://arxiv.org/abs/1701.05748"
+
+# Build settings
+markdown: kramdown
+
+# Jekyll 3 now only supports Kramdown for Markdown
+kramdown:
+  # Use GitHub flavored markdown, including triple backtick fenced code blocks
+  input: GFM
+  # Jekyll 3 and GitHub Pages now only support rouge for syntax highlighting
+  syntax_highlighter: rouge
+  syntax_highlighter_opts:
+    # Use existing pygments syntax highlighting css
+    css_class: 'highlight'
+
+#theme: jekyll-theme-cayman
+gems:
+  - jekyll-feed
+exclude:
+  - Gemfile
+  - Gemfile.lock
