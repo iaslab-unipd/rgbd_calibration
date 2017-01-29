@@ -20,15 +20,26 @@ Main dependencies:
 
 # [](#results)Results
 
+## Depth Correction
+
+Results of the calibration applied to a set of clouds of a wall at different distances.
+
+{% include image.html name="calib_results.png" %}
+
+## RGB-Depth Registration
+
+Resulting RGB-Depth registration using default calibration parameters compared to the RGB-Depth registration after the calibration procedure.
+
+{% include image.html name="original_rgbd.png" %}
+{% include image.html name="calibrated_rgbd.png" %}
+
 ## Visual Odometry
 
 Qualitative results of visual odometry experiments on original and calibrated data. The estimated path (first column) and the clouds reconstructed using the original distorted data and the corrected ones (second and third column respectively) are compared.
 
 {% include image.html name="vo_results.png" %}
 
-**First row:** results obtained from [DVO][dvo-url], a state-of-the-art software.
-
-**Second row:** results obtained from OFVO, a simple approach developed just for testing purposes.
+**First row:** results obtained from [DVO][dvo-url], a state-of-the-art software. **Second row:** results obtained from OFVO, a simpler approach developed just for testing purposes.
 
 
 # [](#publications)Publications
