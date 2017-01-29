@@ -19,9 +19,12 @@ description: Website under construction #RGB-D Calibration
 baseurl: "" # the subpath of your site, e.g. /blog
 url: "http://iaslab-unipd.github.io/rgbd_calibration" # the base hostname & protocol for your site, e.g. http://example.com
 github_username:  bassofil
+
 show_downloads: true
-show_arxiv: true
-arxiv_url: "http://arxiv.org/abs/1701.05748"
+show_paper: true
+paper_website: "ArXiv"
+paper_url: "http://arxiv.org/abs/1701.05748"
+ieee_url: "http://ieeexplore.ieee.org/document/6907780/"
 
 # Build settings
 markdown: kramdown
