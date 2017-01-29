@@ -3,13 +3,16 @@ layout: default
 title: RGB-D Calibration
 ---
 
+# [](#description)Description
+
+Typical consumer-grade **RGB-D cameras** are provided with a coarse intrinsic and extrinsic calibration that generally does not meet the accuracy requirements needed by many robotics applications. Our calibration approach is based on a **novel, two components, measurement error model** that unifies the error sources of different RGB-D pairs based on different technologies, such as structured-light 3D cameras and time-of-flight cameras. The proposed correction model is implemented using two different **parametric undistortion maps** that provide the calibrated readings by means of linear combinations of control functions. A non-linear optimization algorithm refines the camera-depth sensor rigid displacement along with the aforementioned parametric maps in a single optimization step guaranteeing highly reliable results.
+
 # [](#software)Software
 
-The code is available on [GitHub]({{ site.github.repository_url }}) under a [BSD license](https://opensource.org/licenses/BSD-3-Clause).
+The code is available on [GitHub]({{ site.github.repository_url }}) under a [BSD license](https://opensource.org/licenses/BSD-3-Clause) and is specifically developed for [ROS Indigo](http://wiki.ros.org/indigo).
 
 Main dependencies:
 
-- [ROS Indigo](http://wiki.ros.org/indigo)
 - [Eigen](http://eigen.tuxfamily.org/)
 - [PCL](http://pointclouds.org/)
 - [OpenCV](http://opencv.org/)
@@ -17,12 +20,15 @@ Main dependencies:
 
 # [](#results)Results
 
-Qualitative results of _visual odometry_ experiments on original and calibrated data:
+## Visual Odometry
 
-- first row: [DVO][dvo-url];
-- second row: OFVO.
+Qualitative results of visual odometry experiments on original and calibrated data. The estimated path (first column) and the clouds reconstructed using the original distorted data and the corrected ones (second and third column respectively) are compared.
 
 {% include image.html name="vo_results.png" %}
+
+**First row:** results obtained from [DVO][dvo-url], a state-of-the-art software.
+
+**Second row:** results obtained from OFVO, a simple approach developed just for testing purposes.
 
 
 # [](#publications)Publications

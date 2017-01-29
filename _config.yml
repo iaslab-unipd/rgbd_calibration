@@ -24,7 +24,6 @@ show_downloads: true
 show_paper: true
 paper_website: "ArXiv"
 paper_url: "http://arxiv.org/abs/1701.05748"
-ieee_url: "http://ieeexplore.ieee.org/document/6907780/"
 
 # Build settings
 markdown: kramdown
