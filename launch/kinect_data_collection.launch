@@ -1,0 +1,53 @@
+<?xml version="1.0"?>
+<launch>
+
+  <arg name="save_folder" />
+  <arg name="image_extension"           default="png" />
+  <arg name="starting_index"            default="1" />
+  <arg name="image_filename"            default="image_" />
+  <arg name="cloud_filename"            default="cloud_" />
+
+  <arg name="search_checkerboard"       default="false" />
+  
+  <arg name="save_image"                default="true" />
+  <arg name="save_camera_info"          default="true" />
+  <arg name="save_depth_image"          default="true" />
+  <arg name="save_depth_camera_info"    default="true" />
+  <arg name="save_point_cloud"          default="false" />
+  
+  <arg name="camera_type"               default="pinhole" />
+  <arg name="kinect_name"               default="kinect1" />
+  
+  <include file="$(find openni_launch)/launch/openni.launch">
+    <arg name="camera"                  value="$(arg kinect_name)" />
+    <arg name="depth_registration"      value="false" />
+    <arg name="publish_tf"              value="false" />
+  </include>
+
+  <node pkg="rgbd_calibration" type="data_collection" name="data_collection_kinect1" output="screen" required="true">
+    <param name="save_folder"             value="$(arg save_folder)" />
+    <param name="image_extension"         value="$(arg image_extension)" />
+    <param name="starting_index"          value="$(arg starting_index)" />
+    <param name="image_filename"          value="$(arg image_filename)" />
+    <param name="cloud_filename"          value="$(arg cloud_filename)" />
+    <param name="camera_type"             value="$(arg camera_type)" />
+    <param name="search_checkerboard"     value="$(arg search_checkerboard)" />
+    
+    <param name="save_image"              value="$(arg save_image)" />
+    <param name="save_image_camera_info"  value="$(arg save_camera_info)" />
+    <param name="save_depth_image"        value="$(arg save_depth_image)" />
+    <param name="save_depth_camera_info"  value="$(arg save_depth_camera_info)" />
+    <param name="save_point_cloud"        value="$(arg save_point_cloud)" />
+    
+    <param name="depth_type"              value="float32" />
+    
+    <remap from="~action"                 to="/action" />
+    
+    <remap from="~image"                  to="/$(arg kinect_name)/rgb/image_color" />
+    <remap from="~camera_info"            to="/$(arg kinect_name)/rgb/camera_info" />
+    <remap from="~depth_image"            to="/$(arg kinect_name)/depth/image" />
+    <remap from="~depth_camera_info"      to="/$(arg kinect_name)/depth/camera_info" />
+    <remap from="~point_cloud"            to="/$(arg kinect_name)/depth/points" />
+  </node>
+
+</launch>
