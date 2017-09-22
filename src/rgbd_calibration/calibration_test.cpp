@@ -117,7 +117,7 @@ PCLCloudRGB::Ptr CalibrationTest::addData(const cv::Mat & image,
   int index = data_vec_.size() + 1;
 
   cv::Mat rectified = image;
-  color_sensor_->cameraModel()->rectifyImage(image, rectified);
+  //color_sensor_->cameraModel()->rectifyImage(image, rectified);
 
   PinholeSensor::Ptr color_sensor_original = boost::make_shared<PinholeSensor>();
   color_sensor_original->setFrameId("/pinhole_sensor_original");
@@ -1050,12 +1050,12 @@ void CalibrationTest::testCube() const
     const RGBDData & data = *data_vec_.at(i);
 #endif
     cv::Mat tmp_image = data.colorData().clone();
-    cv::Mat tmp_image_rect;
+    //cv::Mat tmp_image_rect = tmp_image;
 
-    cv::undistort(tmp_image, tmp_image_rect,
+    /*cv::undistort(tmp_image, tmp_image_rect,
                   color_sensor_->cameraModel()->intrinsicMatrix(),
                   color_sensor_->cameraModel()->distortionCoeffs(),
-                  color_sensor_->cameraModel()->intrinsicMatrix());
+                  color_sensor_->cameraModel()->intrinsicMatrix());*/
 
     //color_sensor_->cameraModel()->rectifyImage(tmp_image, tmp_image_rect);
     AutomaticCheckerboardFinder finder;
@@ -1077,7 +1077,7 @@ void CalibrationTest::testCube() const
       Pose pose = color_sensor_->estimatePose(corners, checkerboard.corners());
       Checkerboard tmp_checkerboard(6, 6, 0.095, 0.095);
       tmp_checkerboard.transform(pose * Translation3(-0.095, -0.095, 0.0));
-      Cloud2 tmp_corners = color_sensor_->cameraModel()->project3dToPixel(tmp_checkerboard.corners());
+      Cloud2 tmp_corners = color_sensor_->cameraModel()->project3dToPixel2(tmp_checkerboard.corners());
 
       if (found)
       {
@@ -1092,10 +1092,10 @@ void CalibrationTest::testCube() const
         points.push_back(cv::Point(tmp_corners[35].x(), tmp_corners[35].y()));
         points.push_back(cv::Point(tmp_corners[30].x(), tmp_corners[30].y()));
 
-        cv::fillConvexPoly(tmp_image, points, cv::Scalar(c == 0 ? 255 : 0, c == 1 ? 255 : 0, c == 2 ? 255 : 0));
+        cv::fillConvexPoly(tmp_image, points, cv::Scalar(c == 0 ? 128 : 0, c == 1 ? 128 : 0, c == 2 ? 128 : 0));
 
         for (int corner = 0; corner < tmp_corners.elements(); ++corner)
-          cv::circle(tmp_image_rect, cv::Point2f(tmp_corners[corner].x(), tmp_corners[corner].y()), 2, cv::Scalar(c == 0 ? 255 : 0, c == 1 ? 255 : 0, c == 2 ? 255 : 0));
+          cv::circle(tmp_image, cv::Point2f(tmp_corners[corner].x(), tmp_corners[corner].y()), 2, cv::Scalar(c == 0 ? 255 : 0, c == 1 ? 255 : 0, c == 2 ? 255 : 0));
         //cv::fillConvexPoly(tmp_image_rect, points, cv::Scalar(c == 0 ? 255 : 0, c == 1 ? 255 : 0, c == 2 ? 255 : 0));
       }
       else
@@ -1109,7 +1109,7 @@ void CalibrationTest::testCube() const
         Pose pose = color_sensor_->estimatePose(corners, checkerboard.corners());
         tmp_checkerboard = Checkerboard(6, 6, 0.095, 0.095);
         tmp_checkerboard.transform(pose * Translation3(-0.095, -0.095, 0.0));
-        Cloud2 tmp_corners = color_sensor_->cameraModel()->project3dToPixel(tmp_checkerboard.corners());
+        Cloud2 tmp_corners = color_sensor_->cameraModel()->project3dToPixel2(tmp_checkerboard.corners());
 
         if (found)
         {
@@ -1120,10 +1120,10 @@ void CalibrationTest::testCube() const
           points.push_back(cv::Point(tmp_corners[35].x(), tmp_corners[35].y()));
           points.push_back(cv::Point(tmp_corners[30].x(), tmp_corners[30].y()));
 
-          cv::fillConvexPoly(tmp_image, points, cv::Scalar(c == 0 ? 255 : 0, c == 1 ? 255 : 0, c == 2 ? 255 : 0));
+          cv::fillConvexPoly(tmp_image, points, cv::Scalar(c == 0 ? 128 : 0, c == 1 ? 128 : 0, c == 2 ? 128 : 0));
 
           for (int corner = 0; corner < tmp_corners.elements(); ++corner)
-            cv::circle(tmp_image_rect, cv::Point2f(tmp_corners[corner].x(), tmp_corners[corner].y()), 2, cv::Scalar(c == 0 ? 255 : 0, c == 1 ? 255 : 0, c == 2 ? 255 : 0));
+            cv::circle(tmp_image, cv::Point2f(tmp_corners[corner].x(), tmp_corners[corner].y()), 2, cv::Scalar(c == 0 ? 255 : 0, c == 1 ? 255 : 0, c == 2 ? 255 : 0));
           //cv::fillConvexPoly(tmp_image_rect, points, cv::Scalar(c == 0 ? 255 : 0, c == 1 ? 255 : 0, c == 2 ? 255 : 0));
         }
       }
@@ -1145,13 +1145,13 @@ void CalibrationTest::testCube() const
       in[3] = cv::Point3f(depth_corners(0, 3).x(), depth_corners(0, 3).y(), depth_corners(0, 3).z());
 
       std::vector<cv::Point2f> out;
-#ifdef HERRERA
+//#ifdef HERRERA
       cv::projectPoints(in, cv::Mat_<float>::zeros(3, 1), cv::Mat_<float>::zeros(3, 1),
                         depth_sensor_->cameraModel()->intrinsicMatrix(), depth_sensor_->cameraModel()->distortionCoeffs(), out);
-#else
-      cv::projectPoints(in, cv::Mat_<float>::zeros(3, 1), cv::Mat_<float>::zeros(3, 1),
-                        depth_sensor_->cameraModel()->intrinsicMatrix(), cv::Mat(), out);
-#endif
+//#else
+//      cv::projectPoints(in, cv::Mat_<float>::zeros(3, 1), cv::Mat_<float>::zeros(3, 1),
+//                        depth_sensor_->cameraModel()->intrinsicMatrix(), cv::Mat(), out);
+//#endif
       Cloud2 image_corners(Size2(1, 4));
       image_corners(0, 0) = Point2(out[0].x, out[0].y);
       image_corners(0, 1) = Point2(out[1].x, out[1].y);
@@ -1200,10 +1200,10 @@ void CalibrationTest::testCube() const
 
       checkerboards_3d.transform(color_sensor_->pose().inverse());
 
-      Cloud2 proj = color_sensor_->cameraModel()->project3dToPixel(checkerboards_3d);
+      Cloud2 proj = color_sensor_->cameraModel()->project3dToPixel2(checkerboards_3d);
 
       for (Size1 i = 0; i < proj.elements(); ++i)
-        cv::circle(tmp_image_rect, cv::Point(proj[i].x(), proj[i].y()), 1, cv::Scalar(c == 0 ? 255 : 0, c == 1 ? 255 : 0, c == 2 ? 255 : 0));
+        cv::circle(tmp_image, cv::Point(proj[i].x(), proj[i].y()), 1, cv::Scalar(c == 0 ? 255 : 0, c == 1 ? 255 : 0, c == 2 ? 255 : 0));
 
       PlaneFit<Scalar> plane_fit;
       Plane plane = plane_fit.fit(checkerboards_3d);
@@ -1270,7 +1270,7 @@ void CalibrationTest::testCube() const
                         color_sensor_->cameraModel()->intrinsicMatrix(), cv::Mat(), out);
 #endif*/
 
-      cv::circle(tmp_image_rect, out[0], 3, cv::Scalar(0, 0, 255));
+      cv::circle(tmp_image, out[0], 3, cv::Scalar(0, 0, 255));
 
       Scalar a0 = 90.0 - 180.0 / M_PI * std::acos(N.col(0).dot(N.col(1)));
       Scalar a1 = 90.0 - 180.0 / M_PI * std::acos(N.col(1).dot(N.col(2)));
@@ -1314,7 +1314,7 @@ void CalibrationTest::testCube() const
                         color_sensor_->cameraModel()->intrinsicMatrix(), cv::Mat(), out);
 #endif*/
 
-      cv::circle(tmp_image_rect, out[0], 3, cv::Scalar(0, 0, 0));
+      cv::circle(tmp_image, out[0], 3, cv::Scalar(0, 0, 0));
 
       Scalar a0 = 90.0 - 180.0 / M_PI * std::acos(N.col(0).dot(N.col(1)));
       Scalar a1 = 90.0 - 180.0 / M_PI * std::acos(N.col(1).dot(N.col(2)));
@@ -1342,7 +1342,7 @@ void CalibrationTest::testCube() const
 
     ROS_INFO_STREAM(planes.at(0).normal().transpose() << " -- " << planes.at(1).normal().transpose() << " -- " << planes.at(2).normal().transpose() << " -- ");
 
-    cv::imshow("Image", tmp_image_rect);
+    cv::imshow("Image", tmp_image);
     cv::waitKey();
 
     data_vec.back().at(10) = rgb_point.x();

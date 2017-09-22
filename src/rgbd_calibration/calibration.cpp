@@ -112,9 +112,9 @@ Calibration::addData_ (const cv::Mat & image,
   data->setColorSensor(color_sensor_);
   data->setDepthSensor(depth_sensor_);
 
-  cv::Mat rectified;
-  color_sensor_->cameraModel()->rectifyImage(image, rectified);
-  data->setColorData(rectified);
+  //cv::Mat rectified;
+  //color_sensor_->cameraModel()->rectifyImage(image, rectified);
+  data->setColorData(image);
 
   if (ratio_ > 1)
   {
@@ -356,7 +356,7 @@ public:
     cb_corners.container() = checkerboard_pose_eigen * checkerboard_->corners().container().cast<T>();
 
     typename Types<T>::Plane depth_plane(depth_plane_.normal().cast<T>(), T(depth_plane_.offset()));
-    typename Types<T>::Cloud2 reprojected_corners = camera_model_->project3dToPixel<T>(cb_corners);
+    typename Types<T>::Cloud2 reprojected_corners = camera_model_->project3dToPixel2<T>(cb_corners);
 
     cb_corners.transform(color_sensor_pose_eigen);
 
@@ -464,7 +464,10 @@ public:
 
       typename Types<T>::Cloud3 cb_corners(checkerboard_->corners().size());
       cb_corners.container() = checkerboard_pose_eigen * checkerboard_->corners().container().cast<T>();
-      typename Types<T>::Cloud2 reprojected_corners = camera_model_->project3dToPixel<T>(cb_corners);
+
+      typename Types<T>::Cloud2 reprojected_corners(checkerboard_->corners().size());
+      for (Size1 i = 0; i < cb_corners.elements(); ++i)
+        reprojected_corners[i] = camera_model_->project3dToPixel2<T>(cb_corners[i]);
 
       Eigen::Map<Eigen::Matrix<T, 2, Eigen::Dynamic> > residual_map(residuals, 2, cb_corners.elements());
       residual_map = (reprojected_corners.container() - image_corners_.container().cast<T>()) / (0.5 * std::sqrt(T(cb_corners.elements())));
@@ -476,7 +479,7 @@ private:
 
   const PinholeCameraModel::ConstPtr & camera_model_;
   const Checkerboard::ConstPtr & checkerboard_;
-  const Cloud2 & image_corners_;
+  Cloud2 image_corners_;
 };
 
 class TransformDistortionError
