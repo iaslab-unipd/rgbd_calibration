@@ -1,0 +1,70 @@
+<?xml version="1.0"?>
+<launch>
+
+<arg name="ns" default="calibration" />
+
+<group ns="$(arg ns)">
+    <arg name="path"                  default="/home/filippo/Downloads/images/pepper/" />
+    <arg name="instances"             default="1000" />
+    <arg name="image_extension"       default="png" />
+    <arg name="starting_index"        default="10" />
+    <arg name="image_filename"        default="image_" />
+    <arg name="cloud_filename"        default="point_cloud_" />
+
+    <arg name="camera_name"           default="pepper_front" />
+    <arg name="camera_type"           default="pinhole" />
+    <arg name="camera_calib_url"      default="file:///home/filippo/Downloads/images/pepper/camera_info.yaml"/>
+
+    <arg name="depth_camera_name"      default="pepper_depth" />
+    <arg name="depth_type"             default="kinect1_depth" />
+    <arg name="depth_camera_calib_url" default="file:///home/filippo/Downloads/images/pepper/depth_info.yaml" />
+
+    <arg name="downsample_ratio"       default="1" />
+
+	  <!-- launch-prefix="gdb -ex run - -args" -->
+    <node pkg="rgbd_calibration" type="rgbd_offline_calibration" name="rgbd_offline" output="screen" required="true">
+
+        <param name="path"             value="$(arg path)" />
+        <param name="instances"        value="$(arg instances)" />
+        <param name="image_extension"  value="$(arg image_extension)" />
+        <param name="starting_index"   value="$(arg starting_index)" />
+        <param name="image_filename"   value="$(arg image_filename)" />
+        <param name="cloud_filename"   value="$(arg cloud_filename)" />
+
+        <param name="camera_name"      value="$(arg camera_name)" />
+        <param name="camera_type"      value="$(arg camera_type)" />
+        <param name="camera_calib_url" value="$(arg camera_calib_url)" />
+
+        <param name="depth_camera_name"      value="$(arg depth_camera_name)" />
+        <param name="depth_type"             value="$(arg depth_type)" />
+        <param name="depth_camera_calib_url" value="$(arg depth_camera_calib_url)" />
+
+        <rosparam>
+          camera_pose:
+            translation: {x: -0.039, y: 0.044, z: -0.035}
+            rotation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
+
+          depth_image:
+            cols: 320
+            rows: 240
+
+          depth_error_function: [-0.0029, 0.0037, 0.01365]
+
+          undistortion_matrix:
+            cell_size_x: 2
+            cell_size_y: 2
+        </rosparam>
+        <!-- [0.0019, -0.0016, 0.0020] [0.00172, -0.00120, 0.00142]-->
+
+        <param name="downsample_ratio" value="$(arg downsample_ratio)" />
+
+    </node>
+
+    <node pkg="rostopic" type="rostopic" name="checkerboards_pub" output="screen"
+          args="pub -f $(find rgbd_calibration)/conf/checkerboards_pepper.yaml rgbd_offline/checkerboard_array
+                calibration_msgs/CheckerboardArray --latch">
+    </node>
+
+</group>
+
+</launch>

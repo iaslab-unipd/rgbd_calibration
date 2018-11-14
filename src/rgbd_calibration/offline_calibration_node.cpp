@@ -116,18 +116,27 @@ OfflineCalibrationNode::spin ()
           continue;
         }
 
-        const Scalar & fx = depth_sensor_->cameraModel()->fx() * depth_sensor_->cameraModel()->binningX();
+        /*const Scalar & fx = depth_sensor_->cameraModel()->fx() * depth_sensor_->cameraModel()->binningX();
         const Scalar & fy = depth_sensor_->cameraModel()->fy() * depth_sensor_->cameraModel()->binningY();
-    	const Scalar & cx = depth_sensor_->cameraModel()->cx() * depth_sensor_->cameraModel()->binningX();
-    	const Scalar & cy = depth_sensor_->cameraModel()->cy() * depth_sensor_->cameraModel()->binningY();
+        const Scalar & cx = depth_sensor_->cameraModel()->cx() * depth_sensor_->cameraModel()->binningX();
+        const Scalar & cy = depth_sensor_->cameraModel()->cy() * depth_sensor_->cameraModel()->binningY();*/
 
-        for (int k = 0; k < cloud->width; ++k)
+        cv::Matx33d K = /*static_cast<int>(depth_sensor_->cameraModel()->binningX()) **/ depth_sensor_->cameraModel()->fullIntrinsicMatrix();
+
+        for (int j = 0; j < cloud->height; ++j)
         {
-    		for (Size1 j = 0; j < cloud->height; ++j)
-    		{
-    		  cloud->at(k, j).x = (k - cx) * cloud->at(k, j).z / fx;
-    		  cloud->at(k, j).y = (j - cy) * cloud->at(k, j).z / fy;
-    		}
+          for (int k = 0; k < cloud->width; ++k)
+          {
+            /*cloud->at(k, j).x = (k - cx) * cloud->at(k, j).z / fx;
+            cloud->at(k, j).y = (j - cy) * cloud->at(k, j).z / fy;*/
+            Scalar z = cloud->at(k, j).z;
+            Point2 normalized_pixel((k - K(0, 2)) / K(0, 0), (j - K(1, 2)) / K(1, 1));
+
+            Point3 p = z * depth_sensor_->cameraModel()->undistort2d_<Scalar>(normalized_pixel).homogeneous();
+
+            cloud->at(k, j).x = p.x();
+            cloud->at(k, j).y = p.y();
+          }
         }
 
         /*for (size_t v = 0; v < cloud->height; ++v)

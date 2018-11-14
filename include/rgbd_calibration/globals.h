@@ -30,7 +30,7 @@
 #include <pcl/point_cloud.h>
 
 #define G_POLY_DEGREE 2
-#define G_POLY_MIN_DEGREE 0
+#define G_POLY_MIN_DEGREE 1
 #define L_POLY_DEGREE 2
 #define L_POLY_MIN_DEGREE 0
 

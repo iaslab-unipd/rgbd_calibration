@@ -1,0 +1,5 @@
+checkerboards:
+- rows: 7
+  cols: 9
+  cell_width: 0.02
+  cell_height: 0.02

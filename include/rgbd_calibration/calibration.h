@@ -60,10 +60,10 @@ public:
     depth_sensor_ = depth_sensor;
 
     depth_intrinsics_.resize(4);
-    depth_intrinsics_[0] = depth_sensor->cameraModel()->fx();
-    depth_intrinsics_[1] = depth_sensor->cameraModel()->fy();
-    depth_intrinsics_[2] = depth_sensor->cameraModel()->cx();
-    depth_intrinsics_[3] = depth_sensor->cameraModel()->cy();
+    depth_intrinsics_[0] = depth_sensor->cameraModel()->intrinsicMatrix()(0, 0);
+    depth_intrinsics_[1] = depth_sensor->cameraModel()->intrinsicMatrix()(1, 1);
+    depth_intrinsics_[2] = depth_sensor->cameraModel()->intrinsicMatrix()(0, 2);
+    depth_intrinsics_[3] = depth_sensor->cameraModel()->intrinsicMatrix()(1, 2);
   }
 
   const std::vector<double> &
@@ -112,8 +112,8 @@ public:
     estimate_depth_und_model_ = true;
 
     depth_undistortion_estimation_ = boost::make_shared<DepthUndistortionEstimation>();
-//    depth_undistortion_estimation_->setDepthErrorFunction(depth_sensor_->depthErrorFunction());
-    depth_undistortion_estimation_->setDepthErrorFunction(Polynomial<Scalar, 2, 0>(Vector3(0.000, 0.000, 0.0035)));
+    depth_undistortion_estimation_->setDepthErrorFunction(depth_sensor_->depthErrorFunction());
+    //depth_undistortion_estimation_->setDepthErrorFunction(Polynomial<Scalar, 2, 0>(Vector3(0.000, 0.000, 0.0035)));
     depth_undistortion_estimation_->setLocalModel(local_model_);
     depth_undistortion_estimation_->setGlobalModel(global_model_);
     depth_undistortion_estimation_->setMaxThreads(8);

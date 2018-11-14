@@ -446,21 +446,20 @@ public:
   }
 
   template <typename T>
-	typename Types<T>::Pose
-	toEigen (const T * const pose) const
-	{
-	  typename Types<T>::Vector3 rot_vec(pose[0], pose[1], pose[2]);
-	  typename Types<T>::AngleAxis rotation(rot_vec.norm(), rot_vec.normalized());
-	  typename Types<T>::Translation3 translation(pose[3], pose[4], pose[5]);
-	  return translation * rotation;
-	}
+    typename Types<T>::Pose toEigen(const T * const q, const T * const t) const
+    {
+      typename Types<T>::Quaternion rotation(q[0], q[1], q[2], q[3]);
+      typename Types<T>::Translation3 translation(t[0], t[1], t[2]);
+      return translation * rotation;
+    }
 
   template <typename T>
     bool
-	operator () (const T * const checkerboard_pose,
-                 T * residuals) const
+	operator () (const T * const checkerboard_pose_q,
+               const T * const checkerboard_pose_t,
+               T * residuals) const
     {
-      typename Types<T>::Pose checkerboard_pose_eigen = toEigen<T>(checkerboard_pose);
+      typename Types<T>::Pose checkerboard_pose_eigen = toEigen<T>(checkerboard_pose_q, checkerboard_pose_t);
 
       typename Types<T>::Cloud3 cb_corners(checkerboard_->corners().size());
       cb_corners.container() = checkerboard_pose_eigen * checkerboard_->corners().container().cast<T>();
@@ -505,27 +504,28 @@ public:
   }
 
   template <typename T>
-    typename Types<T>::Pose toEigen(const T * const pose) const
+    typename Types<T>::Pose toEigen(const T * const q, const T * const t) const
     {
-      typename Types<T>::Vector3 rot_vec(pose[0], pose[1], pose[2]);
-      typename Types<T>::AngleAxis rotation(rot_vec.norm(), rot_vec.normalized());
-      typename Types<T>::Translation3 translation(pose[3], pose[4], pose[5]);
+      typename Types<T>::Quaternion rotation(q[0], q[1], q[2], q[3]);
+      typename Types<T>::Translation3 translation(t[0], t[1], t[2]);
       return translation * rotation;
     }
 
   template <typename T>
-    bool operator ()(const T * const color_sensor_pose,
+    bool operator ()(const T * const color_sensor_pose_q,
+                     const T * const color_sensor_pose_t,
                      const T * const global_undistortion,
-                     const T * const checkerboard_pose,
+                     const T * const checkerboard_pose_q,
+                     const T * const checkerboard_pose_t,
                      const T * const delta,
                      T * residuals) const
     {
-      typename Types<T>::Pose color_sensor_pose_eigen = toEigen<T>(color_sensor_pose);
-      typename Types<T>::Pose checkerboard_pose_eigen = toEigen<T>(checkerboard_pose);
+      typename Types<T>::Pose color_sensor_pose_eigen = toEigen<T>(color_sensor_pose_q, color_sensor_pose_t);
+      typename Types<T>::Pose checkerboard_pose_eigen = toEigen<T>(checkerboard_pose_q, checkerboard_pose_t);
 
       const int DEGREE = MathTraits<GlobalPolynomial>::Degree;
       const int MIN_DEGREE = MathTraits<GlobalPolynomial>::MinDegree;
-      const int SIZE = DEGREE - MIN_DEGREE + 1;
+      const int SIZE = MathTraits<GlobalPolynomial>::Size;//DEGREE - MIN_DEGREE + 1;
       typedef MathTraits<GlobalPolynomial>::Coefficients Coefficients;
 
       Size1 index = 0;
@@ -564,7 +564,7 @@ public:
       GlobalModel::Data::Ptr global_data = boost::make_shared<GlobalModel::Data>(Size2(2, 2));
       for (int i = 0; i < 3 * MathTraits<GlobalPolynomial>::Size; ++i)
         global_data->container().data()[0 * MathTraits<GlobalPolynomial>::Size + i] = global_undistortion[i];
-      for (int i = 0; i < MathTraits<GlobalPolynomial>::Size; ++i)
+      for (int i = 0; i < SIZE; ++i)
         global_data->container().data()[3 * MathTraits<GlobalPolynomial>::Size + i] = x[i];
 
       GlobalModel::Ptr global_model = boost::make_shared<GlobalModel>(images_size_);
@@ -575,13 +575,21 @@ public:
       typename Types<T>::Cloud3 depth_points(depth_points_.size());
       depth_points.container() = depth_points_.container().cast<T>();
 
-      for (Size1 i = 0; i < depth_points.size().x(); ++i)
+      const cv::Matx33d & K = depth_camera_model_->intrinsicMatrix();
+
+      for (int j = 0; j < depth_points.size().y(); ++j)
       {
-        for (Size1 j = 0; j < depth_points.size().y(); ++j)
+        for (int i = 0; i < depth_points.size().x(); ++i)
         {
           T z = depth_points(i, j).z();
-          depth_points(i, j).x() = (i - (depth_camera_model_->cx() + delta[2])) * depth_points(i, j).z() / (depth_camera_model_->fx() * delta[0]);
-          depth_points(i, j).y() = (j - (depth_camera_model_->cy() + delta[3])) * depth_points(i, j).z() / (depth_camera_model_->fy() * delta[1]);
+          typename Types<T>::Point2 normalized_pixel((i - (K(0, 2) + delta[2])) / (K(0, 0) * delta[0]),
+                                                     (j - (K(1, 2) + delta[3])) / (K(1, 1) * delta[1]));
+
+          depth_points(i, j) = z * depth_camera_model_->undistort2d_<T>(normalized_pixel).homogeneous();
+
+          /*T z = depth_points(i, j).z();
+          depth_points(i, j).x() = (i - (depth_camera_model_->cx() + depth_camera_model_->Tx() + delta[2])) * depth_points(i, j).z() / (depth_camera_model_->fx() * delta[0]);
+          depth_points(i, j).y() = (j - (depth_camera_model_->cy() + depth_camera_model_->Ty() + delta[3])) * depth_points(i, j).z() / (depth_camera_model_->fy() * delta[1]);*/
         }
       }
 
@@ -623,22 +631,27 @@ private:
 
 };
 
-typedef ceres::NumericDiffCostFunction<ReprojectionError, ceres::CENTRAL, ceres::DYNAMIC, 6> ReprojectionCostFunction;
+typedef ceres::NumericDiffCostFunction<ReprojectionError, ceres::CENTRAL, ceres::DYNAMIC, 4, 3> ReprojectionCostFunction;
 
-typedef ceres::NumericDiffCostFunction<TransformDistortionError, ceres::CENTRAL, ceres::DYNAMIC, 6,
-    3 * MathTraits<GlobalPolynomial>::Size, 6, 4> TransformDistortionCostFunction;
+typedef ceres::NumericDiffCostFunction<TransformDistortionError, ceres::CENTRAL, ceres::DYNAMIC, 4, 3,
+    3 * MathTraits<GlobalPolynomial>::Size, 4, 3, 4> TransformDistortionCostFunction;
 
 void
 Calibration::optimizeAll (const std::vector<CheckerboardViews::Ptr> & cb_views_vec)
 {
   ceres::Problem problem;
-  Eigen::Matrix<Scalar, Eigen::Dynamic, 6, Eigen::DontAlign | Eigen::RowMajor> data(cb_views_vec.size(), 6);
+  Eigen::Matrix<Scalar, Eigen::Dynamic, 7, Eigen::DontAlign | Eigen::RowMajor> data(cb_views_vec.size(), 7);
 
-  AngleAxis rotation(color_sensor_->pose().linear());
+  //AngleAxis rotation(color_sensor_->pose().linear());
+  Quaternion rotation(color_sensor_->pose().linear());
   Translation3 translation(color_sensor_->pose().translation());
 
-  Eigen::Matrix<Scalar, 1, 6, Eigen::DontAlign | Eigen::RowMajor> transform;
-  transform.head<3>() = rotation.angle() * rotation.axis();
+  Eigen::Matrix<Scalar, 1, 7 , Eigen::DontAlign | Eigen::RowMajor> transform;
+  //transform.head<3>() = rotation.angle() * rotation.axis();
+  transform[0] = rotation.w();
+  transform[1] = rotation.x();
+  transform[2] = rotation.y();
+  transform[3] = rotation.z();
   transform.tail<3>() = translation.vector();
 
   double delta[4] = {1.0, 1.0, 0.0, 0.0};
@@ -647,8 +660,14 @@ Calibration::optimizeAll (const std::vector<CheckerboardViews::Ptr> & cb_views_v
   {
     const CheckerboardViews & cb_views = *cb_views_vec[i];
 
-    rotation = AngleAxis(cb_views.colorCheckerboard()->pose().linear());
-    data.row(i).head<3>() = rotation.angle() * rotation.axis();
+    /*rotation = AngleAxis(cb_views.colorCheckerboard()->pose().linear());
+    data.row(i).head<3>() = rotation.angle() * rotation.axis();*/
+
+    Quaternion rotation = Quaternion(cb_views.colorCheckerboard()->pose().linear());
+    data.row(i)[0] = rotation.w();
+    data.row(i)[1] = rotation.x();
+    data.row(i)[2] = rotation.y();
+    data.row(i)[3] = rotation.z();
     data.row(i).tail<3>() = cb_views.colorCheckerboard()->pose().translation();
 
     TransformDistortionError * error;
@@ -669,8 +688,10 @@ Calibration::optimizeAll (const std::vector<CheckerboardViews::Ptr> & cb_views_v
     problem.AddResidualBlock(cost_function,
                              NULL,//new ceres::CauchyLoss(1.0),
                              transform.data(),
+                             transform.data() + 4,
                              global_matrix_->model()->dataPtr(),
                              data.row(i).data(),
+                             data.row(i).data() + 4,
                              delta);
 
     ReprojectionError * repr_error = new ReprojectionError(color_sensor_->cameraModel(),
@@ -682,12 +703,17 @@ Calibration::optimizeAll (const std::vector<CheckerboardViews::Ptr> & cb_views_v
 
     problem.AddResidualBlock(repr_cost_function,
                              NULL,//new ceres::CauchyLoss(1.0),
-                             data.row(i).data());
+                             data.row(i).data(),
+                             data.row(i).data() + 4);
+
+    problem.SetParameterization(data.row(i).data(), new ceres::QuaternionParameterization());
   }
+
+  problem.SetParameterization(transform.data(), new ceres::QuaternionParameterization());
 
   ceres::Solver::Options options;
   options.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;
-  options.max_num_iterations = 100;
+  options.max_num_iterations = 20;
   options.minimizer_progress_to_stdout = true;
   options.num_threads = 8;
 
@@ -696,8 +722,7 @@ Calibration::optimizeAll (const std::vector<CheckerboardViews::Ptr> & cb_views_v
   ceres::Solver::Summary summary;
   ceres::Solve(options, &problem, &summary);
 
-  rotation.angle() = transform.head<3>().norm();
-  rotation.axis() = transform.head<3>().normalized();
+  rotation = Quaternion(transform[0], transform[1], transform[2], transform[3]);
   translation.vector() = transform.tail<3>();
 
   color_sensor_->setPose(translation * rotation);
@@ -717,7 +742,7 @@ Calibration::optimizeAll (const std::vector<CheckerboardViews::Ptr> & cb_views_v
   for (int i = 0; i < SIZE; ++i)
   {
     Scalar x(i + 1);
-    Scalar y =  p2.evaluate(x) + p3.evaluate(x)- p1.evaluate(x);
+    Scalar y =  p2.evaluate(x) + p3.evaluate(x) - p1.evaluate(x);
     Scalar tmp(1.0);
     for (int j = 0; j < MIN_DEGREE; ++j)
       tmp *= x;

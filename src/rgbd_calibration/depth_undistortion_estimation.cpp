@@ -473,7 +473,7 @@ void DepthUndistortionEstimation::estimateGlobalModel()
       {
         Indices reduced = *plane_info.indices_;
         std::random_shuffle(reduced.begin(), reduced.end());
-        reduced.resize(reduced.size() / 5);
+        //reduced.resize(reduced.size() / 5);
         global_fit_->accumulateCloud(*und_cloud, reduced);
         global_fit_->addAccumulatedPoints(gt_cb.plane());
       }
